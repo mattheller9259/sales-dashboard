@@ -21,6 +21,11 @@ st.markdown("""
 .commit-card{background:#313244;border-radius:12px;padding:18px 20px;margin-bottom:12px}
 .section-hdr{color:#6c7086;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;margin:18px 0 8px;font-weight:bold}
 #MainMenu,footer,header{visibility:hidden}
+label{color:#cdd6f4 !important}
+[data-testid="stWidgetLabel"]{color:#cdd6f4 !important}
+p{color:#cdd6f4}
+.stMarkdown p{color:#cdd6f4 !important}
+h1,h2,h3{color:#cdd6f4 !important}
 </style>""", unsafe_allow_html=True)
 
 # ── Data storage: GitHub API (cloud) or local file ────────────────────────────
