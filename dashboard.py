@@ -2,30 +2,32 @@ import streamlit as st
 import json, os, base64, requests
 from datetime import datetime, timedelta
 
-st.set_page_config(page_title="Sales Dashboard", page_icon="trophy", layout="wide")
+st.set_page_config(page_title="MCO Sales Dashboard", page_icon="🏠", layout="wide")
 st.markdown("""
 <style>
-[data-testid="stAppViewContainer"]{background:#1e1e2e}
-[data-testid="stSidebar"]{background:#181825}
+[data-testid="stAppViewContainer"]{background:#0d0d0d}
+[data-testid="stSidebar"]{background:#111111}
 .block-container{padding-top:1.5rem}
-.lb-row{background:#313244;border-radius:10px;padding:14px 20px;margin-bottom:8px}
-.metric-card{background:#313244;border-radius:12px;padding:18px 20px;margin-bottom:10px;min-height:110px}
-.card-label{color:#6c7086;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.lb-row{background:#1a1a1a;border-radius:10px;padding:14px 20px;margin-bottom:8px;border-left:3px solid #cc0000}
+.metric-card{background:#1a1a1a;border-radius:12px;padding:18px 20px;margin-bottom:10px;min-height:110px;border-top:2px solid #cc0000}
+.card-label{color:#888888;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
 .card-value{font-size:26px;font-weight:bold;margin:2px 0}
-.card-goal{color:#6c7086;font-size:12px;margin-top:4px}
-.badge-g{background:#a6e3a1;color:#1e1e2e;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:bold}
-.badge-y{background:#f9e2af;color:#1e1e2e;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:bold}
-.badge-r{background:#f38ba8;color:#1e1e2e;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:bold}
-.alert-box{background:#45202a;border:1px solid #f38ba8;border-radius:10px;padding:16px 20px;margin-bottom:16px}
-.commit-box{background:#1e3a2e;border:1px solid #a6e3a1;border-radius:10px;padding:16px 20px;margin-bottom:16px}
-.commit-card{background:#313244;border-radius:12px;padding:18px 20px;margin-bottom:12px}
-.section-hdr{color:#6c7086;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;margin:18px 0 8px;font-weight:bold}
+.card-goal{color:#888888;font-size:12px;margin-top:4px}
+.badge-g{background:#22c55e;color:#ffffff;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:bold}
+.badge-y{background:#f59e0b;color:#ffffff;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:bold}
+.badge-r{background:#cc0000;color:#ffffff;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:bold}
+.alert-box{background:#1a0000;border:1px solid #cc0000;border-radius:10px;padding:16px 20px;margin-bottom:16px}
+.commit-box{background:#001a00;border:1px solid #22c55e;border-radius:10px;padding:16px 20px;margin-bottom:16px}
+.commit-card{background:#1a1a1a;border-radius:12px;padding:18px 20px;margin-bottom:12px;border-left:3px solid #cc0000}
+.section-hdr{color:#888888;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;margin:18px 0 8px;font-weight:bold}
+.mco-header{background:linear-gradient(90deg,#cc0000,#8b0000);padding:16px 24px;border-radius:10px;margin-bottom:20px}
 #MainMenu,footer,header{visibility:hidden}
-label{color:#cdd6f4 !important}
-[data-testid="stWidgetLabel"]{color:#cdd6f4 !important}
-p{color:#cdd6f4}
-.stMarkdown p{color:#cdd6f4 !important}
-h1,h2,h3{color:#cdd6f4 !important}
+label{color:#ffffff !important}
+[data-testid="stWidgetLabel"]{color:#ffffff !important}
+p{color:#ffffff}
+.stMarkdown p{color:#ffffff !important}
+h1,h2,h3{color:#ffffff !important}
+[data-testid="stSidebar"] *{color:#ffffff}
 </style>""", unsafe_allow_html=True)
 
 # ── Data storage: GitHub API (cloud) or local file ────────────────────────────
@@ -131,7 +133,7 @@ def vcolor(val,target):
 data=load_data()
 
 with st.sidebar:
-    st.markdown("### Sales Dashboard")
+    st.markdown("### 🏠 MCO Sales Dashboard")
     st.markdown("---")
     page=st.radio("Navigate",["Team Overview","Daily Commitments","Individual Rep","Log Performance"],label_visibility="collapsed")
     st.markdown("---")
@@ -145,7 +147,10 @@ with st.sidebar:
 
 # ─── TEAM OVERVIEW ────────────────────────────────────────────────────────────
 if page=="Team Overview":
-    st.markdown(f"## Team Performance — {month_label(sel_month)}")
+    st.markdown(f"""<div class="mco-header">
+    <div style="color:#ffffff;font-size:22px;font-weight:bold;letter-spacing:1px">🏠 MIDWEST CASH OFFER</div>
+    <div style="color:#ffcccc;font-size:14px;margin-top:2px">Sales Performance Dashboard — {month_label(sel_month)}</div>
+    </div>""", unsafe_allow_html=True)
     if not data["reps"]:
         st.info("No reps yet. Go to **Log Performance** to get started."); st.stop()
     today=today_key(); yesterday=yesterday_key()
