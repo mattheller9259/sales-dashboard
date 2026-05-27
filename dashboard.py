@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 import json, os, base64, requests
 from datetime import datetime, timedelta
 
@@ -182,11 +182,12 @@ if page=="Team Overview":
         streak=get_streak(rep,data)
         tc=data["commitments"].get(rep,{}).get(today)
         cs,cc=("Committed","#a6e3a1") if tc else ("No commitment yet","#f9e2af")
+        streak_tag = f'&nbsp;<span style="font-size:12px;color:#f9e2af">🔥 {streak}d</span>' if streak>0 else ""
         st.markdown(f"""<div class="lb-row" style="display:flex;align-items:center;justify-content:space-between">
         <div style="display:flex;align-items:center;gap:16px">
           <div style="font-size:22px;width:34px">{icon}</div>
           <div>
-            <div style="color:#cdd6f4;font-size:16px;font-weight:bold">{rep}{"&nbsp; <span style=\\"font-size:12px;color:#f9e2af\\">🔥 "+str(streak)+"d</span>" if streak>0 else ""}</div>
+            <div style="color:#cdd6f4;font-size:16px;font-weight:bold">{rep}{streak_tag}</div>
             <div style="color:#6c7086;font-size:12px">{t["weeks"]} wk logged &nbsp;·&nbsp; {int(t["closed_deals"])} closed &nbsp;·&nbsp; ${t["revenue"]:,.0f} &nbsp;·&nbsp; <span style="color:{cc}">{cs}</span></div>
           </div>
         </div>
