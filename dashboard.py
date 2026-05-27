@@ -257,58 +257,60 @@ elif page=="Daily Numbers":
         # Summary row at top
         if logged:
             st.markdown('<div class="section-hdr">Today\'s Team Summary</div>', unsafe_allow_html=True)
-            c1,c2,c3,c4 = st.columns(4)
-            total_calls = sum(l.get("calls",0) for _,l,_ in logged)
-            total_talk  = sum(l.get("talk_time",0) for _,l,_ in logged)
-            total_appts = sum(l.get("appointments",0) for _,l,_ in logged)
-            total_offers= sum(l.get("offers",0) for _,l,_ in logged)
+            c1,c2,c3,c4,c5 = st.columns(5)
+            total_calls     = sum(l.get("calls",0) for _,l,_ in logged)
+            total_talk      = sum(l.get("talk_time",0) for _,l,_ in logged)
+            total_appts     = sum(l.get("appointments",0) for _,l,_ in logged)
+            total_offers    = sum(l.get("offers",0) for _,l,_ in logged)
+            total_contracts = sum(l.get("contracts",0) for _,l,_ in logged)
             n = len(logged)
-            c1.metric("Total Calls",     int(total_calls),  f"Goal: {30*n}")
-            c2.metric("Total Talk Time", f"{int(total_talk)} min", f"Goal: {120*n} min")
-            c3.metric("Appointments",    int(total_appts))
-            c4.metric("Offers",          int(total_offers))
+            c1.metric("Total Calls",      int(total_calls),      f"Goal: {30*n}")
+            c2.metric("Total Talk Time",  f"{int(total_talk)} min", f"Goal: {120*n} min")
+            c3.metric("Appointments",     int(total_appts))
+            c4.metric("Offers",           int(total_offers))
+            c5.metric("Contracts",        int(total_contracts),  f"Goal: {3*n}/week")
 
         st.markdown('<div class="section-hdr">Daily Leaderboard</div>', unsafe_allow_html=True)
 
         # Header row
-        st.markdown("""<div style="display:grid;grid-template-columns:40px 180px 120px 130px 110px 110px 80px;
+        st.markdown("""<div style="display:grid;grid-template-columns:40px 160px 110px 120px 100px 100px 100px 80px;
         gap:8px;padding:8px 16px;color:#888888;font-size:11px;text-transform:uppercase;letter-spacing:1px">
         <div>#</div><div>Rep</div><div>Calls</div>
-        <div>Talk Time</div><div>Appts</div><div>Offers</div><div>Score</div>
+        <div>Talk Time</div><div>Appts</div><div>Offers</div><div>Contracts</div><div>Score</div>
         </div>""", unsafe_allow_html=True)
 
         for rank,(rep,log,score) in enumerate(board,1):
             if not log:
-                st.markdown(f"""<div style="display:grid;grid-template-columns:40px 180px 120px 130px 110px 110px 80px;
+                st.markdown(f"""<div style="display:grid;grid-template-columns:40px 160px 110px 120px 100px 100px 100px 80px;
                 gap:8px;padding:12px 16px;background:#1a1a1a;border-radius:8px;margin-bottom:6px;
                 border-left:3px solid #333;align-items:center">
                 <div style="color:#888">#{rank}</div>
                 <div style="color:#ffffff;font-weight:bold">{rep}</div>
-                <div style="color:#555555;font-style:italic" colspan="5">No numbers logged yet</div>
-                <div></div><div></div><div></div><div></div>
+                <div style="color:#555;font-style:italic">Not logged</div>
+                <div></div><div></div><div></div><div></div><div></div>
                 </div>""", unsafe_allow_html=True)
                 continue
 
-            calls    = log.get("calls",0);     tc = vcolor(calls,30)
-            talk     = log.get("talk_time",0); tt = vcolor(talk,120)
-            appts    = log.get("appointments",0)
-            offers   = log.get("offers",0)
-            off_rate = (offers/appts*100) if appts>0 else 0; to = vcolor(off_rate,100)
-            medal    = "🥇" if rank==1 else "🥈" if rank==2 else "🥉" if rank==3 else f"#{rank}"
-            sc_col   = "#22c55e" if score>=80 else "#f59e0b" if score>=60 else "#cc0000"
+            calls     = log.get("calls",0);      tc = vcolor(calls,30)
+            talk      = log.get("talk_time",0);  tt = vcolor(talk,120)
+            appts     = log.get("appointments",0)
+            offers    = log.get("offers",0)
+            contracts = log.get("contracts",0)
+            off_rate  = (offers/appts*100) if appts>0 else 0; to = vcolor(off_rate,100)
+            medal     = "🥇" if rank==1 else "🥈" if rank==2 else "🥉" if rank==3 else f"#{rank}"
+            sc_col    = "#22c55e" if score>=80 else "#f59e0b" if score>=60 else "#cc0000"
+            con_col   = "#22c55e" if contracts>=1 else "#ffffff"
 
-            calls_goal  = f"{int(calls)}/30"
-            talk_goal   = f"{int(talk)}/120m"
-
-            st.markdown(f"""<div style="display:grid;grid-template-columns:40px 180px 120px 130px 110px 110px 80px;
+            st.markdown(f"""<div style="display:grid;grid-template-columns:40px 160px 110px 120px 100px 100px 100px 80px;
             gap:8px;padding:14px 16px;background:#1a1a1a;border-radius:8px;margin-bottom:6px;
             border-left:3px solid #cc0000;align-items:center">
             <div style="font-size:18px">{medal}</div>
             <div style="color:#ffffff;font-weight:bold;font-size:15px">{rep}</div>
-            <div style="color:{tc};font-weight:bold">{calls_goal}</div>
-            <div style="color:{tt};font-weight:bold">{talk_goal}</div>
+            <div style="color:{tc};font-weight:bold">{int(calls)}/30</div>
+            <div style="color:{tt};font-weight:bold">{int(talk)}/120m</div>
             <div style="color:#ffffff">{int(appts)}</div>
             <div style="color:{to};font-weight:bold">{int(offers)}</div>
+            <div style="color:{con_col};font-weight:bold">{int(contracts)}</div>
             <div style="color:{sc_col};font-weight:bold">{score}</div>
             </div>""", unsafe_allow_html=True)
 
@@ -336,18 +338,21 @@ elif page=="Daily Numbers":
                 del data["daily_logs"][rep][today_key()]
                 save_data(data); st.rerun()
         else:
-            dc1,dc2 = st.columns(2)
+            dc1,dc2,dc3 = st.columns(3)
             with dc1:
                 d_calls = st.number_input("Calls Made",        min_value=0, value=0)
                 d_talk  = st.number_input("Talk Time (min)",   min_value=0, value=0)
             with dc2:
                 d_appts = st.number_input("Appointments Set",  min_value=0, value=0)
                 d_offers= st.number_input("Offers Made",       min_value=0, value=0)
+            with dc3:
+                d_contracts = st.number_input("Contracts",     min_value=0, value=0)
 
             if st.button("Save Today's Numbers", type="primary"):
                 data["daily_logs"].setdefault(rep,{})[today_key()] = {
                     "calls":d_calls,"talk_time":d_talk,
                     "appointments":d_appts,"offers":d_offers,
+                    "contracts":d_contracts,
                     "logged_at":datetime.now().strftime("%I:%M %p")
                 }
                 save_data(data)
