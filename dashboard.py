@@ -28,6 +28,14 @@ p{color:#ffffff}
 .stMarkdown p{color:#ffffff !important}
 h1,h2,h3{color:#ffffff !important}
 [data-testid="stSidebar"] *{color:#ffffff}
+/* Fix dropdowns and inputs - dark background with white text */
+[data-baseweb="select"] > div{background-color:#1a1a1a !important;color:#ffffff !important;border:1px solid #cc0000 !important}
+[data-baseweb="select"] div{background-color:#1a1a1a !important;color:#ffffff !important}
+[data-baseweb="select"] span{color:#ffffff !important}
+[data-baseweb="popover"] li{background:#1a1a1a !important;color:#ffffff !important}
+[data-baseweb="popover"] li:hover{background:#cc0000 !important}
+.stTextInput input{background:#1a1a1a !important;color:#ffffff !important;border:1px solid #cc0000 !important}
+.stNumberInput input{background:#1a1a1a !important;color:#ffffff !important;border:1px solid #333 !important}
 </style>""", unsafe_allow_html=True)
 
 # ── Data storage: GitHub API (cloud) or local file ────────────────────────────
@@ -131,11 +139,21 @@ def vcolor(val,target):
     else:         return "#f38ba8"
 
 data=load_data()
+if "daily_logs" not in data: data["daily_logs"]={}
+
+DAILY_GOALS={"calls":30,"talk_time":120}
+
+def get_daily_score(log):
+    calls=log.get("calls",0); talk=log.get("talk_time",0)
+    appts=log.get("appointments",0); offers=log.get("offers",0)
+    offer_rate=(offers/appts*100) if appts>0 else 0
+    s = min(calls/30,1)*40 + min(talk/120,1)*40 + min(offer_rate/100,1)*20
+    return round(s,1)
 
 with st.sidebar:
     st.markdown("### 🏠 MCO Sales Dashboard")
     st.markdown("---")
-    page=st.radio("Navigate",["Team Overview","Daily Commitments","Individual Rep","Log Performance"],label_visibility="collapsed")
+    page=st.radio("Navigate",["Team Overview","Daily Numbers","Daily Commitments","Individual Rep","Log Performance"],label_visibility="collapsed")
     st.markdown("---")
     all_months=set([month_key()])
     for rd in data["entries"].values():
@@ -206,6 +224,135 @@ if page=="Team Overview":
           <div style="background:{gbg};color:#1e1e2e;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:17px">{grade}</div>
         </div></div>""",unsafe_allow_html=True)
     if not board: st.info(f"No data logged for {month_label(sel_month)} yet.")
+
+# ─── DAILY NUMBERS ───────────────────────────────────────────────────────────
+elif page=="Daily Numbers":
+    st.markdown(f"""<div class="mco-header">
+    <div style="color:#ffffff;font-size:22px;font-weight:bold;letter-spacing:1px">🏠 MIDWEST CASH OFFER</div>
+    <div style="color:#ffcccc;font-size:14px;margin-top:2px">Daily Numbers — {fmt_date(today_key())}</div>
+    </div>""", unsafe_allow_html=True)
+
+    if not data["reps"]:
+        st.info("No reps yet. Go to **Log Performance** to add reps first."); st.stop()
+
+    tab1, tab2 = st.tabs(["Leaderboard", "Log Today's Numbers"])
+
+    # ── Leaderboard ──
+    with tab1:
+        today = today_key()
+        board = []
+        for rep in data["reps"]:
+            log = data["daily_logs"].get(rep,{}).get(today)
+            if log:
+                score = get_daily_score(log)
+                board.append((rep, log, score))
+            else:
+                board.append((rep, None, -1))
+
+        # Sort: logged entries by score first, then unlogged
+        logged   = sorted([(r,l,s) for r,l,s in board if l], key=lambda x:x[2], reverse=True)
+        unlogged = [(r,l,s) for r,l,s in board if not l]
+        board    = logged + unlogged
+
+        # Summary row at top
+        if logged:
+            st.markdown('<div class="section-hdr">Today\'s Team Summary</div>', unsafe_allow_html=True)
+            c1,c2,c3,c4 = st.columns(4)
+            total_calls = sum(l.get("calls",0) for _,l,_ in logged)
+            total_talk  = sum(l.get("talk_time",0) for _,l,_ in logged)
+            total_appts = sum(l.get("appointments",0) for _,l,_ in logged)
+            total_offers= sum(l.get("offers",0) for _,l,_ in logged)
+            n = len(logged)
+            c1.metric("Total Calls",     int(total_calls),  f"Goal: {30*n}")
+            c2.metric("Total Talk Time", f"{int(total_talk)} min", f"Goal: {120*n} min")
+            c3.metric("Appointments",    int(total_appts))
+            c4.metric("Offers",          int(total_offers))
+
+        st.markdown('<div class="section-hdr">Daily Leaderboard</div>', unsafe_allow_html=True)
+
+        # Header row
+        st.markdown("""<div style="display:grid;grid-template-columns:40px 180px 120px 130px 110px 110px 80px;
+        gap:8px;padding:8px 16px;color:#888888;font-size:11px;text-transform:uppercase;letter-spacing:1px">
+        <div>#</div><div>Rep</div><div>Calls</div>
+        <div>Talk Time</div><div>Appts</div><div>Offers</div><div>Score</div>
+        </div>""", unsafe_allow_html=True)
+
+        for rank,(rep,log,score) in enumerate(board,1):
+            if not log:
+                st.markdown(f"""<div style="display:grid;grid-template-columns:40px 180px 120px 130px 110px 110px 80px;
+                gap:8px;padding:12px 16px;background:#1a1a1a;border-radius:8px;margin-bottom:6px;
+                border-left:3px solid #333;align-items:center">
+                <div style="color:#888">#{rank}</div>
+                <div style="color:#ffffff;font-weight:bold">{rep}</div>
+                <div style="color:#555555;font-style:italic" colspan="5">No numbers logged yet</div>
+                <div></div><div></div><div></div><div></div>
+                </div>""", unsafe_allow_html=True)
+                continue
+
+            calls    = log.get("calls",0);     tc = vcolor(calls,30)
+            talk     = log.get("talk_time",0); tt = vcolor(talk,120)
+            appts    = log.get("appointments",0)
+            offers   = log.get("offers",0)
+            off_rate = (offers/appts*100) if appts>0 else 0; to = vcolor(off_rate,100)
+            medal    = "🥇" if rank==1 else "🥈" if rank==2 else "🥉" if rank==3 else f"#{rank}"
+            sc_col   = "#22c55e" if score>=80 else "#f59e0b" if score>=60 else "#cc0000"
+
+            calls_goal  = f"{int(calls)}/30"
+            talk_goal   = f"{int(talk)}/120m"
+
+            st.markdown(f"""<div style="display:grid;grid-template-columns:40px 180px 120px 130px 110px 110px 80px;
+            gap:8px;padding:14px 16px;background:#1a1a1a;border-radius:8px;margin-bottom:6px;
+            border-left:3px solid #cc0000;align-items:center">
+            <div style="font-size:18px">{medal}</div>
+            <div style="color:#ffffff;font-weight:bold;font-size:15px">{rep}</div>
+            <div style="color:{tc};font-weight:bold">{calls_goal}</div>
+            <div style="color:{tt};font-weight:bold">{talk_goal}</div>
+            <div style="color:#ffffff">{int(appts)}</div>
+            <div style="color:{to};font-weight:bold">{int(offers)}</div>
+            <div style="color:{sc_col};font-weight:bold">{score}</div>
+            </div>""", unsafe_allow_html=True)
+
+        st.markdown("""<div style="color:#555;font-size:11px;margin-top:12px">
+        Goals: Calls 30/day &nbsp;·&nbsp; Talk Time 120 min/day &nbsp;·&nbsp; Offer on every appointment
+        </div>""", unsafe_allow_html=True)
+
+        if not logged:
+            st.info("No reps have logged numbers today yet. Ask them to log their numbers!")
+
+    # ── Log Today's Numbers ──
+    with tab2:
+        st.markdown(f"### Log Numbers for {fmt_date(today_key())}")
+        rep  = st.selectbox("Select Rep", data["reps"], key="daily_rep")
+        existing = data["daily_logs"].get(rep,{}).get(today_key())
+
+        if existing:
+            st.success(f"Numbers already logged at {existing.get('logged_at','')}")
+            ec1,ec2,ec3,ec4 = st.columns(4)
+            ec1.metric("Calls",     int(existing.get("calls",0)),     delta=f"{int(existing.get('calls',0))-30} vs goal")
+            ec2.metric("Talk Time", f"{int(existing.get('talk_time',0))} min", delta=f"{int(existing.get('talk_time',0))-120} vs goal")
+            ec3.metric("Appointments", int(existing.get("appointments",0)))
+            ec4.metric("Offers",    int(existing.get("offers",0)))
+            if st.button("Update Numbers"):
+                del data["daily_logs"][rep][today_key()]
+                save_data(data); st.rerun()
+        else:
+            dc1,dc2 = st.columns(2)
+            with dc1:
+                d_calls = st.number_input("Calls Made",        min_value=0, value=0)
+                d_talk  = st.number_input("Talk Time (min)",   min_value=0, value=0)
+            with dc2:
+                d_appts = st.number_input("Appointments Set",  min_value=0, value=0)
+                d_offers= st.number_input("Offers Made",       min_value=0, value=0)
+
+            if st.button("Save Today's Numbers", type="primary"):
+                data["daily_logs"].setdefault(rep,{})[today_key()] = {
+                    "calls":d_calls,"talk_time":d_talk,
+                    "appointments":d_appts,"offers":d_offers,
+                    "logged_at":datetime.now().strftime("%I:%M %p")
+                }
+                save_data(data)
+                st.success(f"Numbers saved for {rep}!")
+                st.rerun()
 
 # ─── DAILY COMMITMENTS ────────────────────────────────────────────────────────
 elif page=="Daily Commitments":
