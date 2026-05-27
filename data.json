@@ -1,0 +1,36 @@
+{
+  "reps": [
+    "Matt Heller",
+    "Fletcher Mielke"
+  ],
+  "entries": {
+    "Matt Heller": {
+      "2026-05-25": {
+        "calls": 46,
+        "talk_time": 71,
+        "appointments": 2,
+        "offers": 0,
+        "contracts": 0,
+        "closed_deals": 0,
+        "revenue": 0,
+        "spread": 0
+      }
+    },
+    "Fletcher Mielke": {}
+  },
+  "commitments": {
+    "Matt Heller": {
+      "2026-05-27": {
+        "text": "I will get a hold of all of my appointments and have 200 minutes or more of talk time",
+        "goal_calls": 30,
+        "goal_talk_time": 120,
+        "goal_appts": 0,
+        "goal_offers": 0,
+        "submitted_at": "12:55 PM",
+        "hit": null,
+        "notes": "",
+        "reviewed_at": null
+      }
+    }
+  }
+}
