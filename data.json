@@ -16,7 +16,18 @@
         "spread": 0
       }
     },
-    "Fletcher Mielke": {}
+    "Fletcher Mielke": {
+      "2026-05-26": {
+        "calls": 146,
+        "talk_time": 133,
+        "appointments": 5,
+        "offers": 3,
+        "contracts": 0,
+        "closed_deals": 0,
+        "revenue": 0,
+        "spread": 0
+      }
+    }
   },
   "commitments": {
     "Matt Heller": {
@@ -32,5 +43,6 @@
         "reviewed_at": null
       }
     }
-  }
+  },
+  "daily_logs": {}
 }
