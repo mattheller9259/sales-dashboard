@@ -179,10 +179,13 @@ if "coaching_notes"  not in data: data["coaching_notes"]={}
 DAILY_GOALS={"calls":30,"talk_time":120}
 
 def get_daily_score(log):
+    # Contracts carry the most weight — getting 1 deal = 45pts
     calls=log.get("calls",0); talk=log.get("talk_time",0)
     appts=log.get("appointments",0); offers=log.get("offers",0)
+    contracts=log.get("contracts",0)
     offer_rate=(offers/appts*100) if appts>0 else 0
-    s = min(calls/30,1)*40 + min(talk/120,1)*40 + min(offer_rate/100,1)*20
+    s = (min(contracts/1,1)*45 + min(calls/30,1)*25 +
+         min(talk/120,1)*20    + min(offer_rate/100,1)*10)
     return round(s,1)
 
 def get_commit_stats(rep, data, week_start, month_start, today_dt):
@@ -255,13 +258,13 @@ def get_weekly_trend(rep, data, num_weeks=6):
 
 def get_weekly_score(wt):
     """0-100 score for a week's daily-log totals.
-    Weights: calls 30 | talk time 30 | contracts 25 | appt→contract% 15"""
+    Weights: contracts 40 | calls 25 | talk time 20 | appt→contract% 15"""
     calls=wt.get("calls",0); talk=wt.get("talk_time",0)
     appts=wt.get("appointments",0); cons=wt.get("contracts",0)
     acp=(cons/appts*100) if appts>0 else 0
-    s=(min(calls/150,1)*30 + min(talk/600,1)*30 +
-       min(cons/3,1)*25   + min(acp/20,1)*15)
-    return round(s*100, 1)
+    s=(min(cons/3,1)*40  + min(calls/150,1)*25 +
+       min(talk/600,1)*20 + min(acp/20,1)*15)
+    return round(s, 1)
 
 def get_daily_range_totals(rep, data, start_dt, end_dt):
     """Sum daily_logs for a rep across a date range. Returns totals + day-by-day list."""
@@ -423,23 +426,20 @@ if page=="Team Overview":
             tag_txt = f"⚡ IN THE HUNT — {gap:.1f} PTS BACK"
             sc_col = "#a6e3a1"
         stk = f'&nbsp;&nbsp;<span style="color:#f9e2af;font-size:12px">🔥 {streak}d</span>' if streak>0 and rank>1 else ""
-        st.markdown(f"""<div class="{card}">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px">
-          <div style="flex:1;min-width:0">
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
-              <span style="font-size:26px;line-height:1">{medal}</span>
-              <span style="color:#ffffff;font-size:19px;font-weight:bold">{rep}{stk}</span>
-            </div>
-            <span class="{tag_cls}">{tag_txt}</span>
-            <div style="margin-top:12px;font-size:13px;line-height:1.8">{stats_html}</div>
-            {f'<div style="margin-top:8px;color:#666;font-size:11px;font-style:italic">{needs_html}</div>' if needs_html else ""}
-          </div>
-          <div style="text-align:right;flex-shrink:0">
-            <div style="color:{sc_col};font-size:44px;font-weight:bold;line-height:1">{score:.0f}</div>
-            <div style="color:#444;font-size:11px">/ 100</div>
-          </div>
-        </div>
-        </div>""", unsafe_allow_html=True)
+        needs_div = f'<div style="margin-top:8px;color:#666;font-size:11px;font-style:italic">{needs_html}</div>' if needs_html else ""
+        st.markdown(
+            f'<div class="{card}"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px">'
+            f'<div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">'
+            f'<span style="font-size:26px;line-height:1">{medal}</span>'
+            f'<span style="color:#ffffff;font-size:19px;font-weight:bold">{rep}{stk}</span></div>'
+            f'<span class="{tag_cls}">{tag_txt}</span>'
+            f'<div style="margin-top:12px;font-size:13px;line-height:1.8">{stats_html}</div>'
+            f'{needs_div}</div>'
+            f'<div style="text-align:right;flex-shrink:0">'
+            f'<div style="color:{sc_col};font-size:44px;font-weight:bold;line-height:1">{score:.0f}</div>'
+            f'<div style="color:#444;font-size:11px">/ 100</div>'
+            f'</div></div></div>',
+            unsafe_allow_html=True)
 
     def ghost_card(rank, rep):
         st.markdown(f"""<div class="lb-ghost">
