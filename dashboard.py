@@ -183,6 +183,40 @@ def get_daily_score(log):
     s = min(calls/30,1)*40 + min(talk/120,1)*40 + min(offer_rate/100,1)*20
     return round(s,1)
 
+def get_commit_stats(rep, data, week_start, month_start, today_dt):
+    """Returns commitment hit counts for the current week and month."""
+    commits = data.get("commitments", {}).get(rep, {})
+    streak  = get_streak(rep, data)
+    week_hits=0; week_submitted=0; week_dots=""
+    cur = week_start
+    while cur <= today_dt:
+        if cur.weekday() < 5:
+            dk = cur.strftime("%Y-%m-%d")
+            c  = commits.get(dk)
+            if c is not None:
+                week_submitted += 1
+                if   c.get("hit")==True:  week_hits+=1; week_dots+='<span style="color:#22c55e;font-size:16px" title="Hit">●</span> '
+                elif c.get("hit")==False: week_dots+='<span style="color:#cc0000;font-size:16px" title="Missed">●</span> '
+                else:                     week_dots+='<span style="color:#f59e0b;font-size:16px" title="Pending">●</span> '
+            else:
+                week_dots+='<span style="color:#2a2a2a;font-size:16px" title="Not submitted">●</span> '
+        cur += timedelta(days=1)
+    month_hits=0; month_submitted=0
+    cur = month_start
+    while cur <= today_dt:
+        if cur.weekday() < 5:
+            dk = cur.strftime("%Y-%m-%d")
+            c  = commits.get(dk)
+            if c is not None:
+                month_submitted += 1
+                if c.get("hit")==True: month_hits += 1
+        cur += timedelta(days=1)
+    hit_rate = round(month_hits/month_submitted*100) if month_submitted>0 else 0
+    score    = round(hit_rate*0.7 + min(streak/30,1)*30, 1)
+    return {"week_hits":week_hits,"week_submitted":week_submitted,"week_dots":week_dots,
+            "month_hits":month_hits,"month_submitted":month_submitted,
+            "hit_rate":hit_rate,"streak":streak,"score":score}
+
 def get_weekly_score(wt):
     """0-100 score for a week's daily-log totals.
     Weights: calls 30 | talk time 30 | contracts 25 | appt→contract% 15"""
@@ -315,7 +349,7 @@ if page=="Team Overview":
         return "Needs to take the lead: " + " · ".join(parts[:3]) if parts else ""
 
     # ── THREE COMPETITIVE TABS ─────────────────────────────────────────────────
-    tab_day, tab_week, tab_month = st.tabs(["🔥  TODAY", "📅  THIS WEEK", "📊  THIS MONTH"])
+    tab_day, tab_week, tab_month, tab_commit = st.tabs(["🔥  TODAY", "📅  THIS WEEK", "📊  THIS MONTH", "🎯  COMMITMENTS"])
 
     # ── TODAY ──────────────────────────────────────────────────────────────────
     with tab_day:
@@ -439,6 +473,97 @@ if page=="Team Overview":
                 nm=needs_msg(t,m_leader,[("contracts","contract","contracts"),("closed_deals","closed deal","closed deals"),("revenue","revenue","revenue")])
             comp_card(rank,m_total,rep,sc,m_ls-sc,stats,nm,streak)
         if not m_logged: st.info(f"No data logged for {month_label(sel_month)} yet.")
+
+    # ── COMMITMENTS ────────────────────────────────────────────────────────────
+    with tab_commit:
+        c_board=[]
+        for rep in data["reps"]:
+            cs=get_commit_stats(rep,data,week_start,month_start,today_dt)
+            c_board.append((rep,cs))
+        c_board.sort(key=lambda x:(x[1]["score"],x[1]["streak"]),reverse=True)
+        c_total=len(c_board)
+
+        # Team summary
+        submitted=[cs for _,cs in c_board if cs["month_submitted"]>0]
+        if submitted:
+            st.markdown('<div class="section-hdr">Team Commitment Health</div>', unsafe_allow_html=True)
+            sc1,sc2,sc3,sc4=st.columns(4)
+            avg_rate=round(sum(cs["hit_rate"] for cs in submitted)/len(submitted))
+            top_streak=max(cs["streak"] for cs in submitted)
+            total_hits=sum(cs["month_hits"] for cs in submitted)
+            total_sub =sum(cs["month_submitted"] for cs in submitted)
+            sc1.metric("Avg Hit Rate",   f"{avg_rate}%",      "Goal: 80%+")
+            sc2.metric("Team Hits",      f"{total_hits}/{total_sub}", "This month")
+            sc3.metric("Longest Streak", f"{top_streak}d 🔥",  "Current")
+            sc4.metric("Reps Tracked",   len(submitted))
+
+        st.markdown('<div class="section-hdr">Commitment Leaderboard</div>', unsafe_allow_html=True)
+
+        for rank,(rep,cs) in enumerate(c_board,1):
+            streak=cs["streak"]
+            score =cs["score"]
+            leader_score=c_board[0][1]["score"]
+            gap=leader_score-score
+
+            # Tag
+            if rank==1:
+                card,tag_cls="lb-rank1","tag-king"
+                tag_txt="🏆 MOST COMMITTED" if streak<5 else f"🏆 MOST COMMITTED &nbsp; 🔥 {streak}-DAY STREAK"
+                sc_col="#f9e2af"
+            elif rank==2:
+                card,tag_cls="lb-rank2","tag-chase"
+                tag_txt=f"💪 CONSISTENT — {gap:.1f} PTS BEHIND"
+                sc_col="#60a5fa"
+            elif rank==c_total and c_total>=3:
+                card,tag_cls="lb-last","tag-last"
+                tag_txt="⚠️ WORK ON YOUR WORD"
+                sc_col="#f38ba8"
+            else:
+                card,tag_cls="lb-hunt","tag-hunt"
+                tag_txt=f"📈 BUILDING — {gap:.1f} PTS BACK"
+                sc_col="#a6e3a1"
+
+            stk=f'&nbsp;&nbsp;<span style="color:#f9e2af;font-size:12px">🔥 {streak}d</span>' if streak>0 and rank>1 else ""
+            month_bar_pct=cs["hit_rate"]
+            bar_col="#22c55e" if month_bar_pct>=80 else "#f59e0b" if month_bar_pct>=50 else "#cc0000"
+
+            # Week dots label
+            week_label=""
+            for i,day in enumerate(["M","T","W","T","F"]):
+                week_label+=f'<span style="color:#555;font-size:10px;margin-right:1px">{day}</span>&nbsp;'
+
+            st.markdown(f"""<div class="{card}">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px">
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+                  <span style="font-size:26px;line-height:1">{"🥇" if rank==1 else "🥈" if rank==2 else "🥉" if rank==3 else f"#{rank}"}</span>
+                  <span style="color:#ffffff;font-size:19px;font-weight:bold">{rep}{stk}</span>
+                </div>
+                <span class="{tag_cls}">{tag_txt}</span>
+                <div style="margin-top:14px">
+                  <div style="color:#666;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">This Week</div>
+                  <div>{cs["week_dots"] if cs["week_dots"] else '<span style="color:#333;font-size:13px">No commitments submitted this week</span>'}</div>
+                  <div style="color:#555;font-size:11px;margin-top:4px">{cs["week_hits"]} of {cs["week_submitted"]} submitted days hit</div>
+                </div>
+                <div style="margin-top:12px">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+                    <span style="color:#666;font-size:10px;text-transform:uppercase;letter-spacing:1px">This Month</span>
+                    <span style="color:{bar_col};font-size:12px;font-weight:bold">{cs["month_hits"]}/{cs["month_submitted"]} days &nbsp;({cs["hit_rate"]}%)</span>
+                  </div>
+                  <div style="background:#1e1e1e;border-radius:6px;height:8px;overflow:hidden">
+                    <div style="background:{bar_col};height:100%;width:{month_bar_pct}%;border-radius:6px;transition:width 0.3s"></div>
+                  </div>
+                </div>
+              </div>
+              <div style="text-align:right;flex-shrink:0;min-width:80px">
+                <div style="color:{sc_col};font-size:40px;font-weight:bold;line-height:1">{cs["hit_rate"]}</div>
+                <div style="color:#444;font-size:11px">% hit rate</div>
+                <div style="color:#f9e2af;font-size:13px;margin-top:6px">{"🔥 "+str(streak)+"d" if streak>0 else ""}</div>
+              </div>
+            </div>
+            </div>""", unsafe_allow_html=True)
+
+        if not c_board: st.info("No commitment data yet. Have reps submit daily commitments.")
 
 # ─── DAILY NUMBERS ───────────────────────────────────────────────────────────
 elif page=="Daily Numbers":
