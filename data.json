@@ -38,9 +38,9 @@
         "goal_appts": 0,
         "goal_offers": 0,
         "submitted_at": "12:55 PM",
-        "hit": null,
+        "hit": true,
         "notes": "",
-        "reviewed_at": null
+        "reviewed_at": "2026-05-28 13:07"
       }
     }
   },
