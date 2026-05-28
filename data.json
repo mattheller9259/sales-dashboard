@@ -44,5 +44,9 @@
       }
     }
   },
-  "daily_logs": {}
+  "daily_logs": {},
+  "pins": {
+    "Fletcher Mielke": "2001"
+  },
+  "coaching_notes": {}
 }
