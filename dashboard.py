@@ -36,6 +36,17 @@ h1,h2,h3{color:#ffffff !important}
 [data-baseweb="popover"] li:hover{background:#cc0000 !important}
 .stTextInput input{background:#1a1a1a !important;color:#ffffff !important;border:1px solid #cc0000 !important}
 .stNumberInput input{background:#1a1a1a !important;color:#ffffff !important;border:1px solid #333 !important}
+/* Competitive leaderboard cards */
+.lb-rank1{background:#1c1800;border-radius:12px;padding:20px 24px;margin-bottom:12px;border:1px solid rgba(249,226,175,0.35);border-left:5px solid #f9e2af;box-shadow:0 0 30px rgba(249,226,175,0.07)}
+.lb-rank2{background:#0f1520;border-radius:12px;padding:20px 24px;margin-bottom:12px;border-left:5px solid #60a5fa}
+.lb-rank3{background:#1a1208;border-radius:12px;padding:20px 24px;margin-bottom:12px;border-left:5px solid #cd7f32}
+.lb-hunt{background:#141414;border-radius:12px;padding:20px 24px;margin-bottom:12px;border-left:5px solid #333}
+.lb-last{background:#1a0000;border-radius:12px;padding:20px 24px;margin-bottom:12px;border:1px solid rgba(204,0,0,0.4);border-left:5px solid #cc0000}
+.lb-ghost{background:#0f0f0f;border-radius:10px;padding:14px 22px;margin-bottom:8px;border-left:5px solid #1e1e1e}
+.tag-king{display:inline-block;background:rgba(249,226,175,0.12);color:#f9e2af;padding:4px 14px;border-radius:20px;font-size:11px;font-weight:bold;letter-spacing:0.8px;border:1px solid rgba(249,226,175,0.25)}
+.tag-chase{display:inline-block;background:rgba(96,165,250,0.1);color:#60a5fa;padding:4px 14px;border-radius:20px;font-size:11px;font-weight:bold;letter-spacing:0.8px}
+.tag-hunt{display:inline-block;background:rgba(166,227,161,0.08);color:#a6e3a1;padding:4px 14px;border-radius:20px;font-size:11px;font-weight:bold;letter-spacing:0.8px}
+.tag-last{display:inline-block;background:rgba(204,0,0,0.15);color:#f38ba8;padding:4px 14px;border-radius:20px;font-size:11px;font-weight:bold;letter-spacing:0.8px;border:1px solid rgba(204,0,0,0.3)}
 </style>""", unsafe_allow_html=True)
 
 # ── Data storage: GitHub API (cloud) or local file ────────────────────────────
@@ -172,6 +183,16 @@ def get_daily_score(log):
     s = min(calls/30,1)*40 + min(talk/120,1)*40 + min(offer_rate/100,1)*20
     return round(s,1)
 
+def get_weekly_score(wt):
+    """0-100 score for a week's daily-log totals.
+    Weights: calls 30 | talk time 30 | contracts 25 | appt→contract% 15"""
+    calls=wt.get("calls",0); talk=wt.get("talk_time",0)
+    appts=wt.get("appointments",0); cons=wt.get("contracts",0)
+    acp=(cons/appts*100) if appts>0 else 0
+    s=(min(calls/150,1)*30 + min(talk/600,1)*30 +
+       min(cons/3,1)*25   + min(acp/20,1)*15)
+    return round(s*100, 1)
+
 def get_daily_range_totals(rep, data, start_dt, end_dt):
     """Sum daily_logs for a rep across a date range. Returns totals + day-by-day list."""
     logs = data.get("daily_logs", {}).get(rep, {})
@@ -210,61 +231,214 @@ if page=="Team Overview":
     <div style="color:#ffffff;font-size:22px;font-weight:bold;letter-spacing:1px">🏠 MIDWEST CASH OFFER</div>
     <div style="color:#ffcccc;font-size:14px;margin-top:2px">Sales Performance Dashboard — {month_label(sel_month)}</div>
     </div>""", unsafe_allow_html=True)
+
     if not data["reps"]:
-        st.info("No reps yet. Go to **Log Performance** to get started."); st.stop()
-    today=today_key(); yesterday=yesterday_key()
-    no_commit=[r for r in data["reps"] if today not in data["commitments"].get(r,{})]
-    missed_y =[r for r in data["reps"] if data["commitments"].get(r,{}).get(yesterday,{}).get("hit")==False]
-    hit_y    =[r for r in data["reps"] if data["commitments"].get(r,{}).get(yesterday,{}).get("hit")==True]
+        st.info("No reps yet. Go to **Log Weekly Results** to get started."); st.stop()
+
+    today_str = today_key(); yesterday_str = yesterday_key()
+    today_dt  = datetime.now().date()
+    week_start  = today_dt - timedelta(days=today_dt.weekday())
+    month_start = today_dt.replace(day=1)
+
+    # ── Commitment alerts ──────────────────────────────────────────────────────
+    no_commit=[r for r in data["reps"] if today_str not in data["commitments"].get(r,{})]
+    missed_y =[r for r in data["reps"] if data["commitments"].get(r,{}).get(yesterday_str,{}).get("hit")==False]
+    hit_y    =[r for r in data["reps"] if data["commitments"].get(r,{}).get(yesterday_str,{}).get("hit")==True]
     if no_commit:
         st.markdown(f"""<div class="alert-box">
-        <div style="color:#f38ba8;font-weight:bold;font-size:13px">COMMITMENT ALERT — {fmt_date(today)}</div>
-        <div style="color:#cdd6f4;font-size:16px;margin:4px 0"><b>{len(no_commit)} rep{"s" if len(no_commit)!=1 else ""} have not submitted a commitment today</b></div>
+        <div style="color:#f38ba8;font-weight:bold;font-size:13px">COMMITMENT ALERT — {fmt_date(today_str)}</div>
+        <div style="color:#cdd6f4;font-size:16px;margin:4px 0"><b>{len(no_commit)} rep{"s" if len(no_commit)!=1 else ""} haven't submitted a commitment today</b></div>
         <div style="color:#f38ba8;font-size:13px;margin-top:4px">{"  |  ".join(no_commit)}</div>
-        </div>""",unsafe_allow_html=True)
+        </div>""", unsafe_allow_html=True)
     if hit_y:
         st.markdown(f"""<div class="commit-box">
-        <div style="color:#a6e3a1;font-weight:bold;font-size:13px">COMMITMENTS HIT — {fmt_date(yesterday)}</div>
+        <div style="color:#a6e3a1;font-weight:bold;font-size:13px">COMMITMENTS HIT — {fmt_date(yesterday_str)}</div>
         <div style="color:#cdd6f4;font-size:15px;margin-top:4px">{"  |  ".join(hit_y)}</div>
-        </div>""",unsafe_allow_html=True)
+        </div>""", unsafe_allow_html=True)
     if missed_y:
         st.markdown(f"""<div class="alert-box">
-        <div style="color:#f38ba8;font-weight:bold;font-size:13px">COMMITMENTS MISSED — {fmt_date(yesterday)}</div>
+        <div style="color:#f38ba8;font-weight:bold;font-size:13px">COMMITMENTS MISSED — {fmt_date(yesterday_str)}</div>
         <div style="color:#cdd6f4;font-size:15px;margin-top:4px">{"  |  ".join(missed_y)}</div>
-        </div>""",unsafe_allow_html=True)
-    board=[(r,get_monthly(r,sel_month,data)) for r in data["reps"]]
-    board=[(r,t) for r,t in board if t]; board.sort(key=lambda x:x[1]["score"],reverse=True)
-    if board:
-        n=len(board)
-        c1,c2,c3,c4=st.columns(4)
-        c1.metric("Total Revenue", f"${sum(t['revenue'] for _,t in board):,.0f}", f"Goal: ${100000*n:,.0f}")
-        c2.metric("Closed Deals",  int(sum(t['closed_deals'] for _,t in board)),  f"Goal: {6*n}")
-        c3.metric("Contracts",     int(sum(t['contracts'] for _,t in board)),      f"Goal: {12*n}")
-        c4.metric("Avg Score",     f"{round(sum(t['score'] for _,t in board)/n,1)}/100")
-    st.markdown('<div class="section-hdr">Leaderboard</div>',unsafe_allow_html=True)
-    for rank,(rep,t) in enumerate(board,1):
-        sc=t["score"]
-        sc_col="#a6e3a1" if sc>=80 else "#f9e2af" if sc>=60 else "#f38ba8"
-        grade ="A" if sc>=90 else "B" if sc>=80 else "C" if sc>=70 else "D" if sc>=60 else "F"
-        gbg   ="#a6e3a1" if grade in ["A","B"] else "#f9e2af" if grade=="C" else "#f38ba8"
-        icon  =":trophy:" if rank==1 else ":2nd_place_medal:" if rank==2 else ":3rd_place_medal:" if rank==3 else f"#{rank}"
-        streak=get_streak(rep,data)
-        tc=data["commitments"].get(rep,{}).get(today)
-        cs,cc=("Committed","#a6e3a1") if tc else ("No commitment yet","#f9e2af")
-        streak_tag = f'&nbsp;<span style="font-size:12px;color:#f9e2af">🔥 {streak}d</span>' if streak>0 else ""
-        st.markdown(f"""<div class="lb-row" style="display:flex;align-items:center;justify-content:space-between">
-        <div style="display:flex;align-items:center;gap:16px">
-          <div style="font-size:22px;width:34px">{icon}</div>
-          <div>
-            <div style="color:#cdd6f4;font-size:16px;font-weight:bold">{rep}{streak_tag}</div>
-            <div style="color:#6c7086;font-size:12px">{t["weeks"]} wk logged &nbsp;·&nbsp; {int(t["closed_deals"])} closed &nbsp;·&nbsp; ${t["revenue"]:,.0f} &nbsp;·&nbsp; <span style="color:{cc}">{cs}</span></div>
+        </div>""", unsafe_allow_html=True)
+
+    # ── Competitive card renderer ──────────────────────────────────────────────
+    def comp_card(rank, total, rep, score, gap, stats_html, needs_html, streak):
+        medal = "🥇" if rank==1 else "🥈" if rank==2 else "🥉" if rank==3 else f"#{rank}"
+        if rank == 1:
+            card, tag_cls = "lb-rank1", "tag-king"
+            if streak >= 5: tag_txt = f"👑 KING OF THE FLOOR &nbsp; 🔥 {streak}-DAY STREAK"
+            else:           tag_txt = "👑 KING OF THE FLOOR"
+            sc_col = "#f9e2af"
+        elif rank == 2:
+            card, tag_cls = "lb-rank2", "tag-chase"
+            tag_txt = f"😤 CHASING — {gap:.1f} PTS FROM THE TOP"
+            sc_col = "#60a5fa"
+        elif rank == total and total >= 3:
+            card, tag_cls = "lb-last", "tag-last"
+            tag_txt = "🚨 LAST PLACE — The team is watching"
+            sc_col = "#f38ba8"
+        else:
+            card, tag_cls = "lb-hunt", "tag-hunt"
+            tag_txt = f"⚡ IN THE HUNT — {gap:.1f} PTS BACK"
+            sc_col = "#a6e3a1"
+        stk = f'&nbsp;&nbsp;<span style="color:#f9e2af;font-size:12px">🔥 {streak}d</span>' if streak>0 and rank>1 else ""
+        st.markdown(f"""<div class="{card}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px">
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+              <span style="font-size:26px;line-height:1">{medal}</span>
+              <span style="color:#ffffff;font-size:19px;font-weight:bold">{rep}{stk}</span>
+            </div>
+            <span class="{tag_cls}">{tag_txt}</span>
+            <div style="margin-top:12px;font-size:13px;line-height:1.8">{stats_html}</div>
+            {f'<div style="margin-top:8px;color:#666;font-size:11px;font-style:italic">{needs_html}</div>' if needs_html else ""}
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="color:{sc_col};font-size:44px;font-weight:bold;line-height:1">{score:.0f}</div>
+            <div style="color:#444;font-size:11px">/ 100</div>
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:16px">
-          <div style="text-align:right"><div style="color:{sc_col};font-size:28px;font-weight:bold;line-height:1">{sc}</div><div style="color:#6c7086;font-size:11px">/ 100</div></div>
-          <div style="background:{gbg};color:#1e1e2e;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:17px">{grade}</div>
-        </div></div>""",unsafe_allow_html=True)
-    if not board: st.info(f"No data logged for {month_label(sel_month)} yet.")
+        </div>""", unsafe_allow_html=True)
+
+    def ghost_card(rank, rep):
+        st.markdown(f"""<div class="lb-ghost">
+        <span style="color:#333">#{rank}</span>&nbsp;&nbsp;
+        <span style="color:#333;font-style:italic">{rep} — hasn't logged yet</span>
+        </div>""", unsafe_allow_html=True)
+
+    def needs_msg(my_dict, leader_dict, pairs):
+        """pairs = list of (key, label, plural_label)"""
+        parts=[]
+        for key, lbl, plbl in pairs:
+            g = leader_dict.get(key,0) - my_dict.get(key,0)
+            if g > 0: parts.append(f"+{g:.0f} {plbl if g!=1 else lbl}")
+        return "Needs to take the lead: " + " · ".join(parts[:3]) if parts else ""
+
+    # ── THREE COMPETITIVE TABS ─────────────────────────────────────────────────
+    tab_day, tab_week, tab_month = st.tabs(["🔥  TODAY", "📅  THIS WEEK", "📊  THIS MONTH"])
+
+    # ── TODAY ──────────────────────────────────────────────────────────────────
+    with tab_day:
+        rows=[]
+        for rep in data["reps"]:
+            log=data["daily_logs"].get(rep,{}).get(today_str)
+            rows.append((rep, log, get_daily_score(log) if log else -1))
+        logged  =sorted([(r,l,s) for r,l,s in rows if l],key=lambda x:x[2],reverse=True)
+        unlogged=[(r,l,s) for r,l,s in rows if not l]
+        board=logged+unlogged; total=len(board)
+
+        if logged:
+            st.markdown('<div class="section-hdr">Team Today</div>', unsafe_allow_html=True)
+            n=len(logged)
+            tc1,tc2,tc3,tc4,tc5=st.columns(5)
+            tc1.metric("Total Calls",    int(sum(l.get("calls",0) for _,l,_ in logged)),        f"Goal: {30*n}")
+            tc2.metric("Talk Time",      f"{int(sum(l.get('talk_time',0) for _,l,_ in logged))} min", f"Goal: {120*n} min")
+            tc3.metric("Appointments",   int(sum(l.get("appointments",0) for _,l,_ in logged)))
+            tc4.metric("Offers",         int(sum(l.get("offers",0) for _,l,_ in logged)))
+            tc5.metric("Contracts",      int(sum(l.get("contracts",0) for _,l,_ in logged)),    f"Goal: {n}/day")
+
+        st.markdown('<div class="section-hdr">Daily Leaderboard</div>', unsafe_allow_html=True)
+        leader_log  = logged[0][1] if logged else None
+        leader_score= logged[0][2] if logged else 0
+
+        for rank,(rep,log,score) in enumerate(board,1):
+            streak=get_streak(rep,data)
+            if not log: ghost_card(rank,rep); continue
+            calls=log.get("calls",0); talk=log.get("talk_time",0)
+            appts=log.get("appointments",0); offs=log.get("offers",0); cons=log.get("contracts",0)
+            acp=f"{offs/appts*100:.0f}%" if appts>0 else "--"
+            tc=vcolor(calls,30); tt=vcolor(talk,120)
+            stats=(f'<span style="color:{tc};font-weight:bold">{int(calls)} calls</span>'
+                   f' &nbsp;·&nbsp; <span style="color:{tt};font-weight:bold">{int(talk)} min</span>'
+                   f' &nbsp;·&nbsp; <span style="color:{"#22c55e" if cons>=1 else "#cdd6f4"};font-weight:bold">{int(cons)} contracts</span>'
+                   f' &nbsp;·&nbsp; <span style="color:#888">{int(appts)} appts &nbsp;·&nbsp; {acp} offer rate</span>')
+            nm=""
+            if rank>1 and leader_log:
+                nm=needs_msg(log,leader_log,[("calls","call","calls"),("talk_time","min phone","min phone"),("contracts","contract","contracts")])
+            comp_card(rank,total,rep,score,leader_score-score,stats,nm,streak)
+        if not logged: st.info("No reps have logged numbers today yet.")
+
+    # ── THIS WEEK ──────────────────────────────────────────────────────────────
+    with tab_week:
+        wrows=[]
+        for rep in data["reps"]:
+            wt=get_daily_range_totals(rep,data,week_start,today_dt)
+            wrows.append((rep,wt if wt["days_logged"]>0 else None,
+                          get_weekly_score(wt) if wt["days_logged"]>0 else -1))
+        w_logged  =sorted([(r,w,s) for r,w,s in wrows if w],key=lambda x:x[2],reverse=True)
+        w_unlogged=[(r,w,s) for r,w,s in wrows if not w]
+        w_board=w_logged+w_unlogged; w_total=len(w_board)
+
+        if w_logged:
+            st.markdown('<div class="section-hdr">Team This Week</div>', unsafe_allow_html=True)
+            n=len(w_logged)
+            wc1,wc2,wc3,wc4=st.columns(4)
+            tot_appts=sum(w.get("appointments",0) for _,w,_ in w_logged)
+            tot_cons =sum(w.get("contracts",0) for _,w,_ in w_logged)
+            wc1.metric("Total Calls",    int(sum(w.get("calls",0) for _,w,_ in w_logged)),         f"Goal: {150*n}")
+            wc2.metric("Talk Time",      f"{int(sum(w.get('talk_time',0) for _,w,_ in w_logged))} min", f"Goal: {600*n} min")
+            wc3.metric("Contracts",      int(tot_cons),                                              f"Goal: {3*n}")
+            wc4.metric("Appt→Contract",  f"{tot_cons/tot_appts*100:.0f}%" if tot_appts>0 else "--", "Goal: 20%")
+
+        st.markdown('<div class="section-hdr">Weekly Leaderboard</div>', unsafe_allow_html=True)
+        w_leader=w_logged[0][1] if w_logged else None
+        w_ls    =w_logged[0][2] if w_logged else 0
+
+        for rank,(rep,wt,score) in enumerate(w_board,1):
+            streak=get_streak(rep,data)
+            if not wt: ghost_card(rank,rep); continue
+            calls=wt.get("calls",0); talk=wt.get("talk_time",0)
+            appts=wt.get("appointments",0); cons=wt.get("contracts",0)
+            acp=(cons/appts*100) if appts>0 else 0
+            tc=vcolor(calls,150); tt=vcolor(talk,600); kc=vcolor(cons,3); ac=vcolor(acp,20)
+            stats=(f'<span style="color:{tc};font-weight:bold">{int(calls)} calls</span>'
+                   f' &nbsp;·&nbsp; <span style="color:{tt};font-weight:bold">{int(talk)} min</span>'
+                   f' &nbsp;·&nbsp; <span style="color:{kc};font-weight:bold">{int(cons)} contracts</span>'
+                   f' &nbsp;·&nbsp; <span style="color:{ac};font-weight:bold">{acp:.0f}% A→C</span>')
+            nm=""
+            if rank>1 and w_leader:
+                nm=needs_msg(wt,w_leader,[("calls","call","calls"),("talk_time","min phone","min phone"),("contracts","contract","contracts")])
+            comp_card(rank,w_total,rep,score,w_ls-score,stats,nm,streak)
+        if not w_logged: st.info("No reps have logged numbers this week yet.")
+
+    # ── THIS MONTH ─────────────────────────────────────────────────────────────
+    with tab_month:
+        m_board=[(r,get_monthly(r,sel_month,data)) for r in data["reps"]]
+        m_logged  =sorted([(r,t) for r,t in m_board if t],key=lambda x:x[1]["score"],reverse=True)
+        m_unlogged=[(r,t) for r,t in m_board if not t]
+        m_full=m_logged+m_unlogged; m_total=len(m_full)
+
+        if m_logged:
+            n=len(m_logged)
+            st.markdown('<div class="section-hdr">Team This Month</div>', unsafe_allow_html=True)
+            mc1,mc2,mc3,mc4=st.columns(4)
+            tot_appts_m=sum(t["appointments"] for _,t in m_logged)
+            tot_cons_m =sum(t["contracts"] for _,t in m_logged)
+            mc1.metric("Total Revenue",   f"${sum(t['revenue'] for _,t in m_logged):,.0f}",     f"Goal: ${100000*n:,.0f}")
+            mc2.metric("Closed Deals",    int(sum(t['closed_deals'] for _,t in m_logged)),       f"Goal: {6*n}")
+            mc3.metric("Contracts",       int(tot_cons_m),                                        f"Goal: {12*n}")
+            mc4.metric("Appt→Contract",   f"{tot_cons_m/tot_appts_m*100:.0f}%" if tot_appts_m>0 else "--", "Goal: 20%")
+
+        st.markdown('<div class="section-hdr">Monthly Leaderboard</div>', unsafe_allow_html=True)
+        m_leader  =m_logged[0][1] if m_logged else None
+        m_ls      =m_logged[0][1]["score"] if m_logged else 0
+
+        for rank,(rep,t) in enumerate(m_full,1):
+            streak=get_streak(rep,data)
+            if not t: ghost_card(rank,rep); continue
+            sc=t["score"]
+            calls=t.get("calls",0); cons=t.get("contracts",0)
+            rev=t.get("revenue",0); acp=t.get("appt_con_pct",0); cl=t.get("closed_deals",0)
+            tc=vcolor(calls,600); kc=vcolor(cons,12); rc=vcolor(rev,100000); ac=vcolor(acp,20)
+            stats=(f'<span style="color:{tc};font-weight:bold">{int(calls)} calls</span>'
+                   f' &nbsp;·&nbsp; <span style="color:{kc};font-weight:bold">{int(cons)} contracts</span>'
+                   f' &nbsp;·&nbsp; <span style="color:{rc};font-weight:bold">${rev:,.0f} revenue</span>'
+                   f' &nbsp;·&nbsp; <span style="color:#888">{int(cl)} closed &nbsp;·&nbsp; <span style="color:{ac}">{acp:.0f}% A→C</span></span>')
+            nm=""
+            if rank>1 and m_leader:
+                nm=needs_msg(t,m_leader,[("contracts","contract","contracts"),("closed_deals","closed deal","closed deals"),("revenue","revenue","revenue")])
+            comp_card(rank,m_total,rep,sc,m_ls-sc,stats,nm,streak)
+        if not m_logged: st.info(f"No data logged for {month_label(sel_month)} yet.")
 
 # ─── DAILY NUMBERS ───────────────────────────────────────────────────────────
 elif page=="Daily Numbers":
