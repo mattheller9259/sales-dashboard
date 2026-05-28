@@ -308,6 +308,13 @@ if page=="Team Overview":
     </div>
     <div style="color:#ffffff;font-size:48px;font-weight:900;letter-spacing:3px;line-height:1">WIN THE DAY</div>
     <div style="color:#888;font-size:13px;margin-top:8px;letter-spacing:1px">Every call. Every minute. Every day.</div>
+    <div style="margin-top:16px;border-top:1px solid rgba(204,0,0,0.25);padding-top:14px;display:flex;justify-content:center;gap:8px;flex-wrap:wrap">
+      <span style="background:rgba(204,0,0,0.15);border:1px solid rgba(204,0,0,0.4);color:#ffcccc;padding:5px 13px;border-radius:20px;font-size:11px;font-weight:bold;letter-spacing:0.5px">⚡ Demand Enthusiasm</span>
+      <span style="background:rgba(204,0,0,0.15);border:1px solid rgba(204,0,0,0.4);color:#ffcccc;padding:5px 13px;border-radius:20px;font-size:11px;font-weight:bold;letter-spacing:0.5px">💪 Embrace Hard Work</span>
+      <span style="background:rgba(204,0,0,0.15);border:1px solid rgba(204,0,0,0.4);color:#ffcccc;padding:5px 13px;border-radius:20px;font-size:11px;font-weight:bold;letter-spacing:0.5px">📈 Insist on Growth</span>
+      <span style="background:rgba(204,0,0,0.15);border:1px solid rgba(204,0,0,0.4);color:#ffcccc;padding:5px 13px;border-radius:20px;font-size:11px;font-weight:bold;letter-spacing:0.5px">🤝 Live Honestly</span>
+      <span style="background:rgba(204,0,0,0.15);border:1px solid rgba(204,0,0,0.4);color:#ffcccc;padding:5px 13px;border-radius:20px;font-size:11px;font-weight:bold;letter-spacing:0.5px">🏆 Celebrate Teamwork</span>
+    </div>
     </div>""", unsafe_allow_html=True)
 
     st.markdown(f"""<div class="mco-header">
@@ -1284,6 +1291,13 @@ elif page=="How to Use":
     </div>
     <div style="color:#ffffff;font-size:42px;font-weight:900;letter-spacing:3px;line-height:1">WIN THE DAY</div>
     <div style="color:#888;font-size:13px;margin-top:10px;letter-spacing:1px">Every call. Every minute. Every day.</div>
+    <div style="margin-top:16px;border-top:1px solid rgba(204,0,0,0.25);padding-top:14px;display:flex;justify-content:center;gap:8px;flex-wrap:wrap">
+      <span style="background:rgba(204,0,0,0.15);border:1px solid rgba(204,0,0,0.4);color:#ffcccc;padding:5px 13px;border-radius:20px;font-size:11px;font-weight:bold;letter-spacing:0.5px">⚡ Demand Enthusiasm</span>
+      <span style="background:rgba(204,0,0,0.15);border:1px solid rgba(204,0,0,0.4);color:#ffcccc;padding:5px 13px;border-radius:20px;font-size:11px;font-weight:bold;letter-spacing:0.5px">💪 Embrace Hard Work</span>
+      <span style="background:rgba(204,0,0,0.15);border:1px solid rgba(204,0,0,0.4);color:#ffcccc;padding:5px 13px;border-radius:20px;font-size:11px;font-weight:bold;letter-spacing:0.5px">📈 Insist on Growth</span>
+      <span style="background:rgba(204,0,0,0.15);border:1px solid rgba(204,0,0,0.4);color:#ffcccc;padding:5px 13px;border-radius:20px;font-size:11px;font-weight:bold;letter-spacing:0.5px">🤝 Live Honestly</span>
+      <span style="background:rgba(204,0,0,0.15);border:1px solid rgba(204,0,0,0.4);color:#ffcccc;padding:5px 13px;border-radius:20px;font-size:11px;font-weight:bold;letter-spacing:0.5px">🏆 Celebrate Teamwork</span>
+    </div>
     </div>""", unsafe_allow_html=True)
 
     st.markdown(f"""<div class="mco-header">
