@@ -150,6 +150,25 @@ def get_daily_score(log):
     s = min(calls/30,1)*40 + min(talk/120,1)*40 + min(offer_rate/100,1)*20
     return round(s,1)
 
+def get_daily_range_totals(rep, data, start_dt, end_dt):
+    """Sum daily_logs for a rep across a date range. Returns totals + day-by-day list."""
+    logs = data.get("daily_logs", {}).get(rep, {})
+    keys = ["calls","talk_time","appointments","offers","contracts"]
+    totals = {k:0 for k in keys}
+    day_entries = []
+    current = start_dt
+    while current <= end_dt:
+        dk = current.strftime("%Y-%m-%d")
+        entry = logs.get(dk)
+        if entry:
+            for k in keys:
+                totals[k] += entry.get(k, 0)
+            day_entries.append((dk, entry))
+        current += timedelta(days=1)
+    totals["days_logged"] = len(day_entries)
+    totals["day_entries"] = day_entries
+    return totals
+
 with st.sidebar:
     st.markdown("### 🏠 MCO Sales Dashboard")
     st.markdown("---")
@@ -471,41 +490,168 @@ elif page=="Daily Commitments":
 # ─── INDIVIDUAL REP ───────────────────────────────────────────────────────────
 elif page=="Individual Rep":
     if not data["reps"]: st.info("No reps yet."); st.stop()
-    rep=st.selectbox("Select Rep",data["reps"]); t=get_monthly(rep,sel_month,data)
-    st.markdown(f"## {rep} — {month_label(sel_month)}")
-    if not t: st.info(f"No data logged for {rep} in {month_label(sel_month)}."); st.stop()
-    sc=t["score"]; streak=get_streak(rep,data)
-    grade="A" if sc>=90 else "B" if sc>=80 else "C" if sc>=70 else "D" if sc>=60 else "F"
-    sc_col="#a6e3a1" if sc>=80 else "#f9e2af" if sc>=60 else "#f38ba8"
-    gbg="#a6e3a1" if grade in ["A","B"] else "#f9e2af" if grade=="C" else "#f38ba8"
-    st.markdown(f"""<div style="background:#313244;border-radius:12px;padding:20px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center">
-    <div>
-      <div style="color:#6c7086;font-size:11px;text-transform:uppercase;letter-spacing:1px">Performance Score</div>
-      <div style="color:{sc_col};font-size:50px;font-weight:bold;line-height:1.1">{sc}<span style="color:#6c7086;font-size:20px">/100</span></div>
-      <div style="color:#f9e2af;font-size:13px">{"🔥 "+str(streak)+"-day commitment streak" if streak>0 else "No active streak"}</div>
-    </div>
-    <div style="background:{gbg};color:#1e1e2e;width:68px;height:68px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:30px">{grade}</div>
-    </div>""",unsafe_allow_html=True)
-    st.markdown('<div class="section-hdr">Metrics vs Goal</div>',unsafe_allow_html=True)
-    metrics=[("Calls",t["calls"],600,"n"),("Talk Time (min)",t["talk_time"],2400,"n"),
-             ("Appointments",t["appointments"],None,"n"),("Offers",t["offers"],t["appointments"],"n"),
-             ("Offer Rate",t["offer_pct"],100,"%"),("Contracts",t["contracts"],12,"n"),
-             ("Appt to Contract",t["appt_con_pct"],20,"%"),("Contract to Close",t["con_close_pct"],75,"%"),
-             ("Closed Deals",t["closed_deals"],6,"n"),("Revenue",t["revenue"],100000,"$"),
-             ("Avg Spread/Deal",t["avg_spread"],17500,"$")]
-    for i in range(0,len(metrics),3):
-        cols=st.columns(3)
-        for j,col in enumerate(cols):
-            if i+j<len(metrics):
-                lbl,val,quota,fmt=metrics[i+j]
-                with col:
-                    if fmt=="$":   dsp=f"${val:,.0f}";  gs=f"Goal: ${quota:,.0f}" if quota else "--"
-                    elif fmt=="%": dsp=f"{val:.1f}%";   gs=f"Goal: {quota}%" if quota else "--"
-                    else:          dsp=f"{int(val):,}"; gs=f"Goal: {int(quota):,}" if quota else "--"
-                    vc=vcolor(val,quota); bd=badge(val,quota)
-                    st.markdown(f"""<div class="metric-card">
-                    <div class="card-label">{lbl}</div><div class="card-value" style="color:{vc}">{dsp}</div>
-                    <div class="card-goal">{gs} &nbsp; {bd}</div></div>""",unsafe_allow_html=True)
+    rep = st.selectbox("Select Rep", data["reps"])
+
+    today_dt    = datetime.now().date()
+    week_start  = today_dt - timedelta(days=today_dt.weekday())   # Monday
+    month_start = today_dt.replace(day=1)
+
+    t      = get_monthly(rep, sel_month, data)
+    streak = get_streak(rep, data)
+
+    # ── Header ──
+    st.markdown(f"""<div class="mco-header">
+    <div style="color:#ffffff;font-size:20px;font-weight:bold;letter-spacing:1px">{rep}</div>
+    <div style="color:#ffcccc;font-size:13px;margin-top:2px">{month_label(sel_month)}</div>
+    </div>""", unsafe_allow_html=True)
+
+    # ── Score card (only when monthly Log Performance data exists) ──
+    if t:
+        sc    = t["score"]
+        grade = "A" if sc>=90 else "B" if sc>=80 else "C" if sc>=70 else "D" if sc>=60 else "F"
+        sc_col= "#a6e3a1" if sc>=80 else "#f9e2af" if sc>=60 else "#f38ba8"
+        gbg   = "#a6e3a1" if grade in ["A","B"] else "#f9e2af" if grade=="C" else "#f38ba8"
+        st.markdown(f"""<div style="background:#1a1a1a;border-radius:12px;padding:20px;margin-bottom:16px;
+        display:flex;justify-content:space-between;align-items:center;border-top:2px solid #cc0000">
+        <div>
+          <div style="color:#888;font-size:11px;text-transform:uppercase;letter-spacing:1px">Performance Score</div>
+          <div style="color:{sc_col};font-size:50px;font-weight:bold;line-height:1.1">{sc}<span style="color:#888;font-size:20px">/100</span></div>
+          <div style="color:#f9e2af;font-size:13px">{"🔥 "+str(streak)+"-day commitment streak" if streak>0 else "No active streak"}</div>
+        </div>
+        <div style="background:{gbg};color:#1e1e2e;width:68px;height:68px;border-radius:50%;
+        display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:30px">{grade}</div>
+        </div>""", unsafe_allow_html=True)
+    elif streak > 0:
+        st.markdown(f'<div style="color:#f9e2af;font-size:14px;margin-bottom:12px">🔥 {streak}-day commitment streak</div>', unsafe_allow_html=True)
+
+    # ── THIS WEEK ──────────────────────────────────────────────────────────────
+    st.markdown('<div class="section-hdr">This Week — Daily Pacing</div>', unsafe_allow_html=True)
+    wt = get_daily_range_totals(rep, data, week_start, today_dt)
+    days_elapsed = min(today_dt.weekday() + 1, 5)   # 1 (Mon) → 5 (Fri+)
+
+    if wt["days_logged"] == 0:
+        st.info(f"No daily numbers logged this week yet. Have {rep} log numbers in the Daily Numbers page.")
+    else:
+        wc1,wc2,wc3,wc4,wc5 = st.columns(5)
+        week_metrics = [
+            (wc1, "Calls",        wt["calls"],        30,  "",     True),
+            (wc2, "Talk Time",    wt["talk_time"],    120, " min", True),
+            (wc3, "Appointments", wt["appointments"],   0, "",     False),
+            (wc4, "Offers",       wt["offers"],          0, "",     False),
+            (wc5, "Contracts",    wt["contracts"],       0, "",     False),
+        ]
+        for col, lbl, val, daily_goal, unit, has_goal in week_metrics:
+            if has_goal:
+                pace = daily_goal * days_elapsed
+                vc   = vcolor(val, pace)
+                bd   = badge(val, pace)
+                gs   = f"Pace goal: {int(pace)}{unit} &nbsp; {bd}"
+            elif lbl == "Contracts":
+                vc = "#22c55e" if val >= 3 else "#f9e2af" if val >= 1 else "#ffffff"
+                bd = ""
+                gs = "Goal: 3/week"
+            else:
+                vc, bd, gs = "#ffffff", "", "--"
+            col.markdown(f"""<div class="metric-card">
+            <div class="card-label">{lbl}</div>
+            <div class="card-value" style="color:{vc}">{int(val)}{unit}</div>
+            <div class="card-goal">{gs}</div></div>""", unsafe_allow_html=True)
+
+        # Day-by-day breakdown
+        st.markdown('<div class="section-hdr">Day-by-Day This Week</div>', unsafe_allow_html=True)
+        st.markdown("""<div style="display:grid;grid-template-columns:130px 90px 100px 90px 90px 100px;
+        gap:6px;padding:6px 14px;color:#888888;font-size:10px;text-transform:uppercase;letter-spacing:1px">
+        <div>Day</div><div>Calls</div><div>Talk Time</div><div>Appts</div><div>Offers</div><div>Contracts</div>
+        </div>""", unsafe_allow_html=True)
+        for dk, entry in sorted(wt["day_entries"]):
+            day_lbl = datetime.strptime(dk, "%Y-%m-%d").strftime("%a %b %d")
+            c_v = entry.get("calls",0);       tc = vcolor(c_v, 30)
+            tt_v= entry.get("talk_time",0);   tv = vcolor(tt_v, 120)
+            a_v = entry.get("appointments",0)
+            o_v = entry.get("offers",0)
+            k_v = entry.get("contracts",0);   kc = "#22c55e" if k_v >= 1 else "#ffffff"
+            st.markdown(f"""<div style="display:grid;grid-template-columns:130px 90px 100px 90px 90px 100px;
+            gap:6px;padding:11px 14px;background:#1a1a1a;border-radius:8px;margin-bottom:5px;
+            border-left:2px solid #333;align-items:center">
+            <div style="color:#cdd6f4;font-size:13px;font-weight:bold">{day_lbl}</div>
+            <div style="color:{tc};font-weight:bold">{int(c_v)}/30</div>
+            <div style="color:{tv};font-weight:bold">{int(tt_v)} min</div>
+            <div style="color:#ffffff">{int(a_v)}</div>
+            <div style="color:#ffffff">{int(o_v)}</div>
+            <div style="color:{kc};font-weight:bold">{int(k_v)}</div>
+            </div>""", unsafe_allow_html=True)
+
+    # ── THIS MONTH ─────────────────────────────────────────────────────────────
+    st.markdown(f'<div class="section-hdr">This Month — {month_label(sel_month)} Activity</div>', unsafe_allow_html=True)
+
+    if sel_month == month_key():
+        mt = get_daily_range_totals(rep, data, month_start, today_dt)
+        workdays_so_far = sum(
+            1 for i in range((today_dt - month_start).days + 1)
+            if (month_start + timedelta(days=i)).weekday() < 5
+        )
+    else:
+        sel_dt  = datetime.strptime(sel_month + "-01", "%Y-%m-%d").date()
+        next_mo = (sel_dt.replace(day=28) + timedelta(days=4)).replace(day=1)
+        sel_end = next_mo - timedelta(days=1)
+        mt = get_daily_range_totals(rep, data, sel_dt, sel_end)
+        workdays_so_far = sum(
+            1 for i in range((sel_end - sel_dt).days + 1)
+            if (sel_dt + timedelta(days=i)).weekday() < 5
+        )
+
+    if mt["days_logged"] == 0:
+        st.info(f"No daily numbers logged for {month_label(sel_month)} yet.")
+    else:
+        mc1,mc2,mc3,mc4,mc5 = st.columns(5)
+        month_metrics = [
+            (mc1, "Calls",        mt["calls"],        600,  ""),
+            (mc2, "Talk Time",    mt["talk_time"],    2400, " min"),
+            (mc3, "Appointments", mt["appointments"],    0, ""),
+            (mc4, "Offers",       mt["offers"],           0, ""),
+            (mc5, "Contracts",    mt["contracts"],       12, ""),
+        ]
+        for col, lbl, val, goal, unit in month_metrics:
+            if goal:
+                vc = vcolor(val, goal); bd = badge(val, goal)
+                gs = f"Goal: {goal}{unit} &nbsp; {bd}"
+            else:
+                vc, bd, gs = "#ffffff", "", "--"
+            col.markdown(f"""<div class="metric-card">
+            <div class="card-label">{lbl}</div>
+            <div class="card-value" style="color:{vc}">{int(val)}{unit}</div>
+            <div class="card-goal">{gs}</div></div>""", unsafe_allow_html=True)
+
+    # ── MONTHLY RESULTS (from Log Performance — closed deals, revenue, spread) ──
+    if t:
+        st.markdown(f'<div class="section-hdr">Monthly Results — {month_label(sel_month)}</div>', unsafe_allow_html=True)
+        results = [
+            ("Closed Deals",     t["closed_deals"],  6,      "n"),
+            ("Revenue",          t["revenue"],        100000, "$"),
+            ("Avg Spread/Deal",  t["avg_spread"],     17500,  "$"),
+            ("Offer Rate",       t["offer_pct"],      100,    "%"),
+            ("Appt to Contract", t["appt_con_pct"],   20,     "%"),
+            ("Contract to Close",t["con_close_pct"],  75,     "%"),
+        ]
+        for i in range(0, len(results), 3):
+            cols = st.columns(3)
+            for j, col in enumerate(cols):
+                if i+j < len(results):
+                    lbl,val,quota,fmt = results[i+j]
+                    with col:
+                        if fmt=="$":   dsp=f"${val:,.0f}";  gs=f"Goal: ${quota:,.0f}"
+                        elif fmt=="%": dsp=f"{val:.1f}%";   gs=f"Goal: {quota}%"
+                        else:          dsp=f"{int(val):,}"; gs=f"Goal: {int(quota):,}"
+                        vc=vcolor(val,quota); bd=badge(val,quota)
+                        col.markdown(f"""<div class="metric-card">
+                        <div class="card-label">{lbl}</div><div class="card-value" style="color:{vc}">{dsp}</div>
+                        <div class="card-goal">{gs} &nbsp; {bd}</div></div>""", unsafe_allow_html=True)
+    else:
+        st.markdown("""<div style="background:#1a1a1a;border-radius:10px;padding:14px 18px;margin-top:8px">
+        <div style="color:#888;font-size:12px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Closed Deals / Revenue / Spread</div>
+        <div style="color:#cdd6f4;font-size:13px">Use <b>Log Performance</b> to log weekly results (closed deals, revenue, spread).
+        That unlocks the full performance score and percentage metrics.</div>
+        </div>""", unsafe_allow_html=True)
 
 # ─── LOG PERFORMANCE ──────────────────────────────────────────────────────────
 elif page=="Log Performance":
