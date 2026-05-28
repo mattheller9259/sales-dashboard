@@ -1262,6 +1262,13 @@ elif page=="Log Weekly Results":
 
 # ─── HOW TO USE ───────────────────────────────────────────────────────────────
 elif page=="How to Use":
+    st.markdown("""<div style="background:linear-gradient(90deg,#0d0d0d,#1a0000,#0d0d0d);
+    border:1px solid #cc0000;border-radius:12px;padding:28px 24px;margin-bottom:20px;text-align:center">
+    <div style="color:#cc0000;font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:4px;margin-bottom:8px">Midwest Cash Offer</div>
+    <div style="color:#ffffff;font-size:42px;font-weight:900;letter-spacing:3px;line-height:1">WIN THE DAY</div>
+    <div style="color:#888;font-size:13px;margin-top:10px;letter-spacing:1px">Every call. Every minute. Every day.</div>
+    </div>""", unsafe_allow_html=True)
+
     st.markdown(f"""<div class="mco-header">
     <div style="color:#ffffff;font-size:22px;font-weight:bold;letter-spacing:1px">🏠 How to Use This Dashboard</div>
     <div style="color:#ffcccc;font-size:14px;margin-top:2px">Everything your team needs to know — bookmark this page</div>
