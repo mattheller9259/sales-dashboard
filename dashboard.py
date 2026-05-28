@@ -282,12 +282,63 @@ def get_daily_range_totals(rep, data, start_dt, end_dt):
     totals["day_entries"] = day_entries
     return totals
 
+def get_standards_compliance(rep, data, month_start, today_dt):
+    logs = data.get("daily_logs", {}).get(rep, {})
+    days_logged=0; calls_hit=0; talk_hit=0; both_hit=0; wd_elapsed=0
+    cur = month_start
+    while cur <= today_dt:
+        if cur.weekday() < 5:
+            wd_elapsed += 1
+            log = logs.get(cur.strftime("%Y-%m-%d"))
+            if log:
+                days_logged += 1
+                c = log.get("calls",0) >= 30
+                t = log.get("talk_time",0) >= 120
+                if c: calls_hit += 1
+                if t: talk_hit += 1
+                if c and t: both_hit += 1
+        cur += timedelta(days=1)
+    lp = round(days_logged/wd_elapsed*100) if wd_elapsed>0 else 0
+    cp = round(calls_hit/days_logged*100)   if days_logged>0 else 0
+    tp = round(talk_hit/days_logged*100)    if days_logged>0 else 0
+    bp = round(both_hit/days_logged*100)    if days_logged>0 else 0
+    return {"days_logged":days_logged,"wd_elapsed":wd_elapsed,
+            "calls_hit":calls_hit,"talk_hit":talk_hit,"both_hit":both_hit,
+            "log_pct":lp,"calls_pct":cp,"talk_pct":tp,"both_pct":bp}
+
+def get_consecutive_miss(rep, data):
+    logs = data.get("daily_logs",{}).get(rep,{})
+    today_dt = datetime.now().date()
+    no_log=0; below=0
+    check = today_dt - timedelta(days=1)
+    for _ in range(30):
+        if check.weekday()>=5: check-=timedelta(days=1); continue
+        log=logs.get(check.strftime("%Y-%m-%d"))
+        if not log: no_log+=1; check-=timedelta(days=1)
+        else: break
+    check = today_dt - timedelta(days=1)
+    for _ in range(30):
+        if check.weekday()>=5: check-=timedelta(days=1); continue
+        log=logs.get(check.strftime("%Y-%m-%d"))
+        if not log or (log.get("calls",0)<30 and log.get("talk_time",0)<120):
+            below+=1; check-=timedelta(days=1)
+        else: break
+    return {"no_log":no_log,"below_standards":below}
+
+def get_accountability_score(rep, data, month_start, today_dt):
+    comp = get_standards_compliance(rep, data, month_start, today_dt)
+    week_start2 = today_dt - timedelta(days=today_dt.weekday())
+    cs = get_commit_stats(rep, data, week_start2, month_start, today_dt)
+    score = (min(comp["log_pct"],100)*0.25 + min(comp["calls_pct"],100)*0.25 +
+             min(comp["talk_pct"],100)*0.25 + min(cs["hit_rate"],100)*0.25)
+    return round(score,1)
+
 with st.sidebar:
     st.markdown("""<div style="background:#ffffff;border-radius:10px;padding:8px 14px;text-align:center;margin-bottom:4px">
     <img src="https://raw.githubusercontent.com/mattheller9259/sales-dashboard/main/logo.png" style="max-width:100%;height:auto;max-height:54px">
     </div>""", unsafe_allow_html=True)
     st.markdown("---")
-    page=st.radio("Navigate",["Team Overview","Daily Numbers","Daily Commitments","Individual Rep","Weekly Recap","Log Weekly Results","How to Use"],label_visibility="collapsed")
+    page=st.radio("Navigate",["Team Overview","Daily Numbers","Daily Commitments","Individual Rep","Weekly Recap","Log Weekly Results","Month-End Summary","How to Use"],label_visibility="collapsed")
     st.markdown("---")
     all_months=set([month_key()])
     for rd in data["entries"].values():
@@ -404,8 +455,23 @@ if page=="Team Overview":
             if g > 0: parts.append(f"+{g:.0f} {plbl if g!=1 else lbl}")
         return "Needs to take the lead: " + " · ".join(parts[:3]) if parts else ""
 
-    # ── THREE COMPETITIVE TABS ─────────────────────────────────────────────────
-    tab_day, tab_week, tab_month, tab_commit = st.tabs(["🔥  TODAY", "📅  THIS WEEK", "📊  THIS MONTH", "🎯  COMMITMENTS"])
+    # ── Consecutive miss alerts ────────────────────────────────────────────────
+    miss_alerts=[]
+    for r in data["reps"]:
+        cm=get_consecutive_miss(r,data)
+        if cm["no_log"]>=2:
+            miss_alerts.append((r,f"Has not logged numbers for <b>{cm['no_log']} consecutive days</b>","no_log"))
+        elif cm["below_standards"]>=2:
+            miss_alerts.append((r,f"Below standards (calls + talk time) for <b>{cm['below_standards']} consecutive days</b>","below"))
+    if miss_alerts:
+        rows_html="".join([f'<div style="color:#f38ba8;font-size:13px;margin-top:6px">⚠️ <b>{r}</b> — {msg}</div>' for r,msg,_ in miss_alerts])
+        st.markdown(f"""<div class="alert-box">
+        <div style="color:#f38ba8;font-weight:bold;font-size:14px">🚨 ACCOUNTABILITY ALERT</div>
+        {rows_html}
+        </div>""", unsafe_allow_html=True)
+
+    # ── FIVE COMPETITIVE TABS ─────────────────────────────────────────────────
+    tab_day, tab_week, tab_month, tab_commit, tab_standards = st.tabs(["🔥  TODAY", "📅  THIS WEEK", "📊  THIS MONTH", "🎯  COMMITMENTS", "📋  STANDARDS"])
 
     # ── TODAY ──────────────────────────────────────────────────────────────────
     with tab_day:
@@ -620,6 +686,53 @@ if page=="Team Overview":
             </div>""", unsafe_allow_html=True)
 
         if not c_board: st.info("No commitment data yet. Have reps submit daily commitments.")
+
+    # ── STANDARDS ──────────────────────────────────────────────────────────────
+    with tab_standards:
+        st.markdown('<div class="section-hdr">Daily Standards Compliance — This Month</div>', unsafe_allow_html=True)
+        st.markdown('<div style="color:#666;font-size:12px;margin-bottom:14px">Standards: 30 calls/day &nbsp;·&nbsp; 120 min talk time/day &nbsp;·&nbsp; Numbers logged every workday</div>', unsafe_allow_html=True)
+
+        s_board=[]
+        for rep in data["reps"]:
+            comp=get_standards_compliance(rep,data,month_start,today_dt)
+            acct=get_accountability_score(rep,data,month_start,today_dt)
+            cm=get_consecutive_miss(rep,data)
+            s_board.append((rep,comp,acct,cm))
+        s_board.sort(key=lambda x:x[2],reverse=True)
+
+        # Header
+        st.markdown("""<div style="display:grid;grid-template-columns:160px 120px 120px 120px 120px 100px;
+        gap:8px;padding:8px 16px;color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #222">
+        <div>Rep</div><div>Days Logged</div><div>Calls ≥30</div><div>Talk ≥120m</div><div>Both Hit</div><div>Acct Score</div>
+        </div>""", unsafe_allow_html=True)
+
+        for rep,comp,acct,cm in s_board:
+            lc=vcolor(comp["log_pct"],80); cc=vcolor(comp["calls_pct"],80)
+            tc=vcolor(comp["talk_pct"],80); bc=vcolor(comp["both_pct"],80)
+            ac_col="#a6e3a1" if acct>=80 else "#f9e2af" if acct>=60 else "#f38ba8"
+            flag=""
+            if cm["no_log"]>=2: flag=f'<span style="color:#f38ba8;font-size:10px"> ⚠️ {cm["no_log"]}d no log</span>'
+            elif cm["below_standards"]>=2: flag=f'<span style="color:#f9e2af;font-size:10px"> ⚠️ {cm["below_standards"]}d below</span>'
+            st.markdown(f"""<div style="display:grid;grid-template-columns:160px 120px 120px 120px 120px 100px;
+            gap:8px;padding:13px 16px;background:#1a1a1a;border-radius:8px;margin-bottom:6px;
+            border-left:3px solid #cc0000;align-items:center">
+            <div style="color:#fff;font-weight:bold">{rep}{flag}</div>
+            <div style="color:{lc};font-weight:bold">{comp["days_logged"]}/{comp["wd_elapsed"]} <span style="color:#555;font-size:11px">({comp["log_pct"]}%)</span></div>
+            <div style="color:{cc};font-weight:bold">{comp["calls_hit"]}d <span style="color:#555;font-size:11px">({comp["calls_pct"]}%)</span></div>
+            <div style="color:{tc};font-weight:bold">{comp["talk_hit"]}d <span style="color:#555;font-size:11px">({comp["talk_pct"]}%)</span></div>
+            <div style="color:{bc};font-weight:bold">{comp["both_hit"]}d <span style="color:#555;font-size:11px">({comp["both_pct"]}%)</span></div>
+            <div style="color:{ac_col};font-weight:bold;font-size:18px">{acct}</div>
+            </div>""", unsafe_allow_html=True)
+
+        if not s_board: st.info("Add reps to get started.")
+
+        # Legend
+        st.markdown("""<div style="margin-top:14px;display:flex;gap:16px;flex-wrap:wrap">
+        <span style="color:#a6e3a1;font-size:11px">● 80%+ On Track</span>
+        <span style="color:#f9e2af;font-size:11px">● 60–79% Close</span>
+        <span style="color:#f38ba8;font-size:11px">● Below 60% Behind</span>
+        <span style="color:#888;font-size:11px">Accountability Score = avg of: log rate + calls compliance + talk compliance + commitment hit rate</span>
+        </div>""", unsafe_allow_html=True)
 
 # ─── DAILY NUMBERS ───────────────────────────────────────────────────────────
 elif page=="Daily Numbers":
@@ -899,16 +1012,23 @@ elif page=="Individual Rep":
     </div>""", unsafe_allow_html=True)
 
     # ── Score card ──
+    acct_score = get_accountability_score(rep, data, month_start, today_dt)
+    acct_col = "#a6e3a1" if acct_score>=80 else "#f9e2af" if acct_score>=60 else "#f38ba8"
     if t:
         sc=t["score"]; grade="A" if sc>=90 else "B" if sc>=80 else "C" if sc>=70 else "D" if sc>=60 else "F"
         sc_col="#a6e3a1" if sc>=80 else "#f9e2af" if sc>=60 else "#f38ba8"
         gbg="#a6e3a1" if grade in ["A","B"] else "#f9e2af" if grade=="C" else "#f38ba8"
         st.markdown(f"""<div style="background:#1a1a1a;border-radius:12px;padding:20px;margin-bottom:16px;
-        display:flex;justify-content:space-between;align-items:center;border-top:2px solid #cc0000">
+        display:flex;justify-content:space-between;align-items:center;border-top:2px solid #cc0000;gap:16px;flex-wrap:wrap">
         <div>
           <div style="color:#888;font-size:11px;text-transform:uppercase;letter-spacing:1px">Performance Score</div>
           <div style="color:{sc_col};font-size:50px;font-weight:bold;line-height:1.1">{sc}<span style="color:#888;font-size:20px">/100</span></div>
           <div style="color:#f9e2af;font-size:13px">{"🔥 "+str(streak)+"-day commitment streak" if streak>0 else "No active streak"}</div>
+        </div>
+        <div style="text-align:center">
+          <div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Accountability</div>
+          <div style="color:{acct_col};font-size:36px;font-weight:bold;line-height:1">{acct_score}</div>
+          <div style="color:#444;font-size:11px">/100</div>
         </div>
         <div style="background:{gbg};color:#1e1e2e;width:68px;height:68px;border-radius:50%;
         display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:30px">{grade}</div>
@@ -980,6 +1100,59 @@ elif page=="Individual Rep":
                 <div style="color:#fff">{int(av)}</div><div style="color:#fff">{int(ov)}</div>
                 <div style="color:{"#22c55e" if kv>=1 else "#fff"};font-weight:bold">{int(kv)}</div>
                 </div>""", unsafe_allow_html=True)
+
+        # ── Standards Compliance This Month ───────────────────────────────────
+        comp = get_standards_compliance(rep, data, month_start, today_dt)
+        if comp["wd_elapsed"] > 0:
+            st.markdown('<div class="section-hdr">Standards Compliance This Month</div>', unsafe_allow_html=True)
+            sc1,sc2,sc3,sc4 = st.columns(4)
+            for col,lbl,val,goal in [(sc1,"Days Logged",f'{comp["days_logged"]}/{comp["wd_elapsed"]}',comp["log_pct"]),
+                                     (sc2,"Call Standard (30+)",f'{comp["calls_hit"]} days',comp["calls_pct"]),
+                                     (sc3,"Talk Standard (120+ min)",f'{comp["talk_hit"]} days',comp["talk_pct"]),
+                                     (sc4,"Both Standards Hit",f'{comp["both_hit"]} days',comp["both_pct"])]:
+                bar_col="#a6e3a1" if goal>=80 else "#f9e2af" if goal>=60 else "#f38ba8"
+                col.markdown(f"""<div class="metric-card">
+                <div class="card-label">{lbl}</div>
+                <div class="card-value" style="color:{bar_col}">{val}</div>
+                <div style="background:#2a2a2a;border-radius:4px;height:6px;margin-top:8px">
+                  <div style="background:{bar_col};width:{goal}%;height:100%;border-radius:4px"></div>
+                </div>
+                <div class="card-goal" style="margin-top:4px">{goal}% compliance</div>
+                </div>""", unsafe_allow_html=True)
+
+        # ── Conversion Funnel ──────────────────────────────────────────────────
+        if t or (comp["wd_elapsed"]>0 and comp["days_logged"]>0):
+            month_key_cur = sel_month
+            if month_key_cur == month_key():
+                mt2 = get_daily_range_totals(rep, data, month_start, today_dt)
+            else:
+                sd2 = datetime.strptime(month_key_cur+"-01","%Y-%m-%d").date()
+                se2 = (sd2.replace(day=28)+timedelta(days=4)).replace(day=1)-timedelta(days=1)
+                mt2 = get_daily_range_totals(rep, data, sd2, se2)
+            calls2=mt2["calls"]; appts2=mt2["appointments"]; offs2=mt2["offers"]
+            cons2=mt2["contracts"]; closed2=t["closed_deals"] if t else 0
+            if calls2>0:
+                st.markdown('<div class="section-hdr">Conversion Funnel</div>', unsafe_allow_html=True)
+                def funnel_pct(a,b): return f"{a/b*100:.0f}%" if b>0 else "--"
+                def funnel_bar(a,b,col):
+                    w=round(a/b*100) if b>0 else 0
+                    return f'<div style="background:#2a2a2a;border-radius:6px;height:10px;flex:1"><div style="background:{col};width:{w}%;height:100%;border-radius:6px"></div></div>'
+                stages=[
+                    ("📞 Calls Made",     calls2, calls2,  "#cc0000"),
+                    ("📅 Appointments",   appts2, calls2,  "#f59e0b"),
+                    ("💼 Offers Made",    offs2,  appts2,  "#60a5fa"),
+                    ("📝 Contracts",      cons2,  offs2,   "#a6e3a1"),
+                    ("🏠 Closed Deals",   closed2,cons2,   "#22c55e"),
+                ]
+                for i,(lbl,val,prev,col) in enumerate(stages):
+                    conv = funnel_pct(val,prev) if i>0 else "—"
+                    bar  = funnel_bar(val,calls2,col)
+                    st.markdown(f"""<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #1e1e1e">
+                    <div style="width:160px;color:#cdd6f4;font-size:13px">{lbl}</div>
+                    <div style="width:60px;color:{col};font-weight:bold;font-size:16px;text-align:right">{int(val)}</div>
+                    {bar}
+                    <div style="width:60px;color:#666;font-size:11px;text-align:right">{"→ "+conv if i>0 else ""}</div>
+                    </div>""", unsafe_allow_html=True)
 
     # ── TAB 2: TRENDS ──────────────────────────────────────────────────────────
     with ir_tab2:
@@ -1061,23 +1234,66 @@ elif page=="Individual Rep":
     # ── TAB 4: COACHING NOTES ──────────────────────────────────────────────────
     with ir_tab4:
         notes=data["coaching_notes"].get(rep,[])
-        st.markdown('<div class="section-hdr">Coaching Notes</div>', unsafe_allow_html=True)
+        today_dt2=datetime.now().date()
+
+        # Due this week section
+        due_soon=[n for n in notes if n.get("follow_up") and not n.get("completed") and
+                  datetime.strptime(n["follow_up"],"%Y-%m-%d").date()<=today_dt2+timedelta(days=7)]
+        if due_soon:
+            st.markdown('<div class="section-hdr">⚠️ Action Items Due This Week</div>', unsafe_allow_html=True)
+            for n in due_soon:
+                fu=datetime.strptime(n["follow_up"],"%Y-%m-%d")
+                overdue = fu.date()<today_dt2
+                col_fu="#f38ba8" if overdue else "#f9e2af"
+                lbl="OVERDUE" if overdue else f"Due {fu.strftime('%b %d')}"
+                st.markdown(f"""<div style="background:#1a0a00;border-radius:8px;padding:12px 16px;
+                margin-bottom:8px;border-left:4px solid {col_fu}">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <div>
+                    <div style="color:{col_fu};font-size:11px;font-weight:bold;margin-bottom:4px">{lbl} &nbsp;·&nbsp; {n.get("added_by","Manager")} &nbsp;·&nbsp; {n.get("date","")}</div>
+                    <div style="color:#cdd6f4;font-size:13px">{n.get("note","")}</div>
+                  </div>
+                </div>
+                </div>""", unsafe_allow_html=True)
+                ni=notes.index(n)
+                if st.button(f"Mark Complete ✅",key=f"complete_{rep}_{ni}"):
+                    data["coaching_notes"][rep][ni]["completed"]=True
+                    save_data(data); st.rerun()
+
+        st.markdown('<div class="section-hdr">All Coaching Notes</div>', unsafe_allow_html=True)
         if notes:
-            for note in reversed(notes[-10:]):
+            for idx,note in enumerate(reversed(notes[-15:])):
+                ni=len(notes)-1-idx
+                completed=note.get("completed",False)
+                has_fu=bool(note.get("follow_up"))
+                border_col="#22c55e" if completed else "#f9e2af" if has_fu else "#cc0000"
+                fu_txt=""
+                if has_fu:
+                    fu_d=datetime.strptime(note["follow_up"],"%Y-%m-%d")
+                    fu_txt=f' &nbsp;·&nbsp; <span style="color:{"#a6e3a1" if completed else "#f9e2af"}">{"✅ Done" if completed else "Follow up: "+fu_d.strftime("%b %d")}</span>'
                 st.markdown(f"""<div style="background:#1a1a1a;border-radius:8px;padding:14px 18px;
-                margin-bottom:8px;border-left:3px solid #cc0000">
-                <div style="color:#888;font-size:11px;margin-bottom:6px">{note.get("date","")} &nbsp;·&nbsp; {note.get("added_by","Manager")}</div>
+                margin-bottom:8px;border-left:3px solid {border_col}">
+                <div style="color:#888;font-size:11px;margin-bottom:6px">{note.get("date","")} &nbsp;·&nbsp; {note.get("added_by","Manager")}{fu_txt}</div>
                 <div style="color:#cdd6f4;font-size:14px">{note.get("note","")}</div>
                 </div>""", unsafe_allow_html=True)
+                if has_fu and not completed:
+                    if st.button("Mark Complete ✅",key=f"done_{rep}_{ni}"):
+                        data["coaching_notes"][rep][ni]["completed"]=True
+                        save_data(data); st.rerun()
         else:
             st.info("No coaching notes yet for this rep.")
+
         st.markdown('<div class="section-hdr">Add Note</div>', unsafe_allow_html=True)
-        note_txt=st.text_area("Note",placeholder="e.g. Great week — offer rate improved significantly. Work on follow-up calls.",height=100,key="note_input")
-        added_by=st.text_input("Your name",value="Manager",key="note_author")
+        note_txt=st.text_area("Note",placeholder="e.g. Great week — offer rate improved. Work on follow-up calls.",height=100,key="note_input")
+        na1,na2=st.columns(2)
+        with na1: added_by=st.text_input("Your name",value="Manager",key="note_author")
+        with na2: follow_up_date=st.date_input("Follow-up date (optional)",value=None,key="note_fu",help="Set a date to be reminded to follow up on this note")
         if st.button("Save Note",type="primary",key="save_note"):
             if note_txt.strip():
-                data["coaching_notes"].setdefault(rep,[]).append(
-                    {"date":today_key(),"note":note_txt.strip(),"added_by":added_by.strip() or "Manager"})
+                new_note={"date":today_key(),"note":note_txt.strip(),
+                          "added_by":added_by.strip() or "Manager","completed":False}
+                if follow_up_date: new_note["follow_up"]=follow_up_date.strftime("%Y-%m-%d")
+                data["coaching_notes"].setdefault(rep,[]).append(new_note)
                 save_data(data); st.success("Note saved!"); st.rerun()
             else:
                 st.warning("Please write a note first.")
@@ -1279,6 +1495,111 @@ elif page=="Log Weekly Results":
                         save_data(data); st.success(f"PIN removed for {rep_name}."); st.rerun()
     else:
         st.info("Add reps above first.")
+
+# ─── MONTH-END SUMMARY ────────────────────────────────────────────────────────
+elif page=="Month-End Summary":
+    import pandas as pd
+    today_dt=datetime.now().date()
+    month_start=today_dt.replace(day=1)
+    st.markdown(f"""<div class="mco-header">
+    <div style="color:#ffffff;font-size:22px;font-weight:bold;letter-spacing:1px">📋 Month-End Summary</div>
+    <div style="color:#ffcccc;font-size:14px;margin-top:2px">{month_label(sel_month)} — Full team performance review</div>
+    </div>""", unsafe_allow_html=True)
+    if not data["reps"]: st.info("No reps yet."); st.stop()
+
+    sel_ms=datetime.strptime(sel_month+"-01","%Y-%m-%d").date()
+    sel_me=(sel_ms.replace(day=28)+timedelta(days=4)).replace(day=1)-timedelta(days=1)
+    is_current = sel_month==month_key()
+    eff_end = min(sel_me, today_dt) if is_current else sel_me
+
+    for rep in data["reps"]:
+        t=get_monthly(rep,sel_month,data)
+        comp=get_standards_compliance(rep,data,sel_ms,eff_end)
+        acct=get_accountability_score(rep,data,sel_ms,eff_end) if is_current else None
+        streak=get_streak(rep,data)
+        week_start3=today_dt-timedelta(days=today_dt.weekday())
+        cs=get_commit_stats(rep,data,week_start3,sel_ms,eff_end)
+        proj=get_pace_projection(rep,data,today_dt,month_start) if is_current else None
+
+        acct_col="#a6e3a1" if (acct or 0)>=80 else "#f9e2af" if (acct or 0)>=60 else "#f38ba8"
+
+        st.markdown(f"""<div style="background:#1a1a1a;border-radius:12px;padding:22px 24px;margin-bottom:18px;border-top:3px solid #cc0000">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:16px">
+          <div>
+            <div style="color:#ffffff;font-size:20px;font-weight:bold">{rep}</div>
+            <div style="color:#888;font-size:12px;margin-top:2px">{month_label(sel_month)}</div>
+          </div>
+          <div style="display:flex;gap:20px;flex-wrap:wrap;text-align:center">
+            {"" if acct is None else f'<div><div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px">Accountability</div><div style="color:{acct_col};font-size:28px;font-weight:bold">{acct}</div></div>'}
+            <div><div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px">Commit Hit Rate</div><div style="color:#{"22c55e" if cs["hit_rate"]>=80 else "f9e2af" if cs["hit_rate"]>=50 else "cc0000"};font-size:28px;font-weight:bold">{cs["hit_rate"]}%</div></div>
+            <div><div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px">Streak</div><div style="color:#f9e2af;font-size:28px;font-weight:bold">{"🔥 "+str(streak)+"d" if streak>0 else "—"}</div></div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+          <div style="background:#111;border-radius:8px;padding:12px;text-align:center">
+            <div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px">Days Logged</div>
+            <div style="color:{vcolor(comp["log_pct"],80)};font-size:22px;font-weight:bold">{comp["days_logged"]}/{comp["wd_elapsed"]}</div>
+            <div style="color:#555;font-size:11px">{comp["log_pct"]}% logged</div>
+          </div>
+          <div style="background:#111;border-radius:8px;padding:12px;text-align:center">
+            <div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px">Call Standard Hit</div>
+            <div style="color:{vcolor(comp["calls_pct"],80)};font-size:22px;font-weight:bold">{comp["calls_hit"]}d</div>
+            <div style="color:#555;font-size:11px">{comp["calls_pct"]}% of logged days</div>
+          </div>
+          <div style="background:#111;border-radius:8px;padding:12px;text-align:center">
+            <div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px">Talk Standard Hit</div>
+            <div style="color:{vcolor(comp["talk_pct"],80)};font-size:22px;font-weight:bold">{comp["talk_hit"]}d</div>
+            <div style="color:#555;font-size:11px">{comp["talk_pct"]}% of logged days</div>
+          </div>
+          <div style="background:#111;border-radius:8px;padding:12px;text-align:center">
+            <div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px">Both Standards</div>
+            <div style="color:{vcolor(comp["both_pct"],80)};font-size:22px;font-weight:bold">{comp["both_hit"]}d</div>
+            <div style="color:#555;font-size:11px">{comp["both_pct"]}% compliance</div>
+          </div>
+        </div>""", unsafe_allow_html=True)
+
+        if t:
+            mt3=get_daily_range_totals(rep,data,sel_ms,eff_end)
+            calls3=mt3["calls"]; appts3=mt3["appointments"]; offs3=mt3["offers"]
+            cons3=mt3["contracts"]; closed3=t["closed_deals"]
+            rev3=t["revenue"]; spread3=t["spread"]
+            st.markdown(f"""<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+            <div style="background:#111;border-radius:8px;padding:12px;text-align:center">
+              <div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px">Total Calls</div>
+              <div style="color:{vcolor(calls3,600)};font-size:22px;font-weight:bold">{int(calls3)}</div>
+              <div style="color:#555;font-size:11px">Goal: 600</div>
+            </div>
+            <div style="background:#111;border-radius:8px;padding:12px;text-align:center">
+              <div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px">Contracts</div>
+              <div style="color:{vcolor(cons3,12)};font-size:22px;font-weight:bold">{int(cons3)}</div>
+              <div style="color:#555;font-size:11px">Goal: 12</div>
+            </div>
+            <div style="background:#111;border-radius:8px;padding:12px;text-align:center">
+              <div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px">Closed / Revenue</div>
+              <div style="color:{vcolor(rev3,100000)};font-size:22px;font-weight:bold">{int(closed3)} / ${rev3:,.0f}</div>
+              <div style="color:#555;font-size:11px">Goal: 6 / $100k</div>
+            </div>
+            </div>""", unsafe_allow_html=True)
+
+            # Conversion funnel inline
+            funnel_data=[(calls3,"Calls","#cc0000"),(appts3,"Appts","#f59e0b"),(offs3,"Offers","#60a5fa"),(cons3,"Contracts","#a6e3a1"),(closed3,"Closed","#22c55e")]
+            fd_html='<div style="display:flex;gap:6px;align-items:flex-end;margin-bottom:6px">'
+            for val,lbl,col in funnel_data:
+                pct=round(val/calls3*100) if calls3>0 else 0
+                h=max(pct,4)
+                fd_html+=f'<div style="text-align:center;flex:1"><div style="color:{col};font-size:12px;font-weight:bold;margin-bottom:3px">{int(val)}</div><div style="background:{col};height:{h}px;border-radius:3px 3px 0 0;opacity:0.8"></div><div style="color:#555;font-size:10px;margin-top:3px">{lbl}</div></div>'
+            fd_html+='</div>'
+            st.markdown(f'<div style="background:#111;border-radius:8px;padding:14px;margin-bottom:14px"><div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Conversion Funnel</div>{fd_html}</div>', unsafe_allow_html=True)
+
+        # Coaching notes for this rep
+        notes=data["coaching_notes"].get(rep,[])
+        open_items=[n for n in notes if n.get("follow_up") and not n.get("completed")]
+        if open_items:
+            items_html="".join([f'<div style="color:#f9e2af;font-size:12px;margin-top:5px">↳ {n["note"][:80]} <span style="color:#666">— Due {n["follow_up"]}</span></div>' for n in open_items[-3:]])
+            st.markdown(f'<div style="background:#111;border-radius:8px;padding:12px;margin-bottom:14px"><div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Open Action Items ({len(open_items)})</div>{items_html}</div>', unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # ─── HOW TO USE ───────────────────────────────────────────────────────────────
 elif page=="How to Use":
