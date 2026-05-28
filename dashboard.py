@@ -285,7 +285,7 @@ def get_daily_range_totals(rep, data, start_dt, end_dt):
 with st.sidebar:
     st.markdown("### 🏠 MCO Sales Dashboard")
     st.markdown("---")
-    page=st.radio("Navigate",["Team Overview","Daily Numbers","Daily Commitments","Individual Rep","Weekly Recap","Log Weekly Results"],label_visibility="collapsed")
+    page=st.radio("Navigate",["Team Overview","Daily Numbers","Daily Commitments","Individual Rep","Weekly Recap","Log Weekly Results","How to Use"],label_visibility="collapsed")
     st.markdown("---")
     all_months=set([month_key()])
     for rd in data["entries"].values():
@@ -1259,3 +1259,75 @@ elif page=="Log Weekly Results":
                         save_data(data); st.success(f"PIN removed for {rep_name}."); st.rerun()
     else:
         st.info("Add reps above first.")
+
+# ─── HOW TO USE ───────────────────────────────────────────────────────────────
+elif page=="How to Use":
+    st.markdown(f"""<div class="mco-header">
+    <div style="color:#ffffff;font-size:22px;font-weight:bold;letter-spacing:1px">🏠 How to Use This Dashboard</div>
+    <div style="color:#ffcccc;font-size:14px;margin-top:2px">Everything your team needs to know — bookmark this page</div>
+    </div>""", unsafe_allow_html=True)
+
+    st.markdown("""<div style="background:#1a1a1a;border-radius:12px;padding:22px 26px;margin-bottom:16px;border-left:5px solid #22c55e">
+    <div style="color:#22c55e;font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">📋 FOR REPS — Morning Routine</div>
+    <div style="color:#cdd6f4;font-size:14px;line-height:2">
+    <b style="color:#ffffff">Step 1</b> &nbsp;→&nbsp; Open <b>mcosalesdashboard.streamlit.app</b><br>
+    <b style="color:#ffffff">Step 2</b> &nbsp;→&nbsp; Click <b>Daily Commitments</b> in the left sidebar<br>
+    <b style="color:#ffffff">Step 3</b> &nbsp;→&nbsp; Select your name and enter your PIN<br>
+    <b style="color:#ffffff">Step 4</b> &nbsp;→&nbsp; Write your commitment for the day — what will you accomplish?<br>
+    <b style="color:#ffffff">Step 5</b> &nbsp;→&nbsp; Hit <b>Submit Commitment</b><br>
+    <b style="color:#ffffff">Step 6</b> &nbsp;→&nbsp; Check <b>Team Overview</b> to see where you rank on the leaderboard
+    </div>
+    </div>""", unsafe_allow_html=True)
+
+    st.markdown("""<div style="background:#1a1a1a;border-radius:12px;padding:22px 26px;margin-bottom:16px;border-left:5px solid #cc0000">
+    <div style="color:#f38ba8;font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">📊 FOR REPS — End of Day Routine</div>
+    <div style="color:#cdd6f4;font-size:14px;line-height:2">
+    <b style="color:#ffffff">Step 1</b> &nbsp;→&nbsp; Open <b>mcosalesdashboard.streamlit.app</b><br>
+    <b style="color:#ffffff">Step 2</b> &nbsp;→&nbsp; Click <b>Daily Numbers</b> in the left sidebar<br>
+    <b style="color:#ffffff">Step 3</b> &nbsp;→&nbsp; Click the <b>Log Today's Numbers</b> tab<br>
+    <b style="color:#ffffff">Step 4</b> &nbsp;→&nbsp; Select your name and enter your PIN<br>
+    <b style="color:#ffffff">Step 5</b> &nbsp;→&nbsp; Enter your numbers for the day:<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#888">• Calls Made &nbsp;·&nbsp; Talk Time (minutes) &nbsp;·&nbsp; Appointments Set &nbsp;·&nbsp; Offers Made &nbsp;·&nbsp; Contracts</span><br>
+    <b style="color:#ffffff">Step 6</b> &nbsp;→&nbsp; Hit <b>Save Today's Numbers</b><br>
+    <b style="color:#ffffff">Step 7</b> &nbsp;→&nbsp; Check the <b>Leaderboard</b> tab to see where you stand
+    </div>
+    </div>""", unsafe_allow_html=True)
+
+    st.markdown("""<div style="background:#1a1a1a;border-radius:12px;padding:22px 26px;margin-bottom:16px;border-left:5px solid #f9e2af">
+    <div style="color:#f9e2af;font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">👔 FOR MANAGERS — Daily & Weekly</div>
+    <div style="color:#cdd6f4;font-size:14px;line-height:2">
+    <b style="color:#ffffff">Every day</b> &nbsp;→&nbsp; Check <b>Team Overview</b> to monitor the leaderboard and commitment status<br>
+    <b style="color:#ffffff">Every day</b> &nbsp;→&nbsp; Check <b>Daily Commitments → Review Yesterday</b> to mark commitments Hit ✅ or Missed ❌<br>
+    <b style="color:#ffffff">Every Monday</b> &nbsp;→&nbsp; Open <b>Weekly Recap</b> for a full breakdown of last week's performance<br>
+    <b style="color:#ffffff">Once a week</b> &nbsp;→&nbsp; Go to <b>Log Weekly Results</b> to enter closed deals, revenue &amp; spread<br>
+    <b style="color:#ffffff">Anytime</b> &nbsp;→&nbsp; Use <b>Individual Rep</b> to see pacing, trends, and add coaching notes
+    </div>
+    </div>""", unsafe_allow_html=True)
+
+    st.markdown("""<div style="background:#1a1a1a;border-radius:12px;padding:22px 26px;margin-bottom:16px;border-left:5px solid #60a5fa">
+    <div style="color:#60a5fa;font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">📍 Page Guide — What Each Page Does</div>
+    <div style="color:#cdd6f4;font-size:14px;line-height:2.2">
+    <b style="color:#ffffff">Team Overview</b> &nbsp;·&nbsp; Competitive leaderboard for Today, This Week, and This Month. Shows who's #1, who's chasing, and who needs to step it up.<br>
+    <b style="color:#ffffff">Daily Numbers</b> &nbsp;·&nbsp; Where reps log their end-of-day activity. Also shows today's leaderboard with calls, talk time, and contracts.<br>
+    <b style="color:#ffffff">Daily Commitments</b> &nbsp;·&nbsp; Morning commitment submission. Manager reviews yesterday's commitments each day to mark Hit or Missed.<br>
+    <b style="color:#ffffff">Individual Rep</b> &nbsp;·&nbsp; Deep dive on one rep — on-pace indicators, 6-week trends, monthly results, and coaching notes.<br>
+    <b style="color:#ffffff">Weekly Recap</b> &nbsp;·&nbsp; Monday morning review. Every rep's full week at a glance — great for team meetings.<br>
+    <b style="color:#ffffff">Log Weekly Results</b> &nbsp;·&nbsp; Manager only. Enter closed deals, revenue, and spread each week. Also where PINs are managed.
+    </div>
+    </div>""", unsafe_allow_html=True)
+
+    st.markdown("""<div style="background:#1a0000;border:1px solid #cc0000;border-radius:12px;padding:18px 24px;margin-bottom:16px">
+    <div style="color:#f38ba8;font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">⚠️ Important Notes</div>
+    <div style="color:#cdd6f4;font-size:14px;line-height:2">
+    • Your <b>PIN</b> is personal — do not share it with other reps<br>
+    • Log your numbers <b>every day</b> — missing a day affects your weekly and monthly score<br>
+    • The dashboard may take <b>30–60 seconds to load</b> if it hasn't been used recently — just wait, it will wake up<br>
+    • Everyone with the link can see the full leaderboard — that's by design
+    </div>
+    </div>""", unsafe_allow_html=True)
+
+    st.markdown(f"""<div style="background:#1a1a1a;border-radius:12px;padding:18px 24px;text-align:center">
+    <div style="color:#888;font-size:12px;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Bookmark This Link</div>
+    <div style="color:#cc0000;font-size:20px;font-weight:bold">mcosalesdashboard.streamlit.app</div>
+    <div style="color:#888;font-size:12px;margin-top:6px">Midwest Cash Offer — Sales Performance Dashboard</div>
+    </div>""", unsafe_allow_html=True)
