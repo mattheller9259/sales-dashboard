@@ -689,49 +689,98 @@ if page=="Team Overview":
 
     # ── STANDARDS ──────────────────────────────────────────────────────────────
     with tab_standards:
-        st.markdown('<div class="section-hdr">Daily Standards Compliance — This Month</div>', unsafe_allow_html=True)
-        st.markdown('<div style="color:#666;font-size:12px;margin-bottom:14px">Standards: 30 calls/day &nbsp;·&nbsp; 120 min talk time/day &nbsp;·&nbsp; Numbers logged every workday</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-hdr">Standards & Leading Indicators — This Month</div>', unsafe_allow_html=True)
+        st.markdown('<div style="color:#666;font-size:12px;margin-bottom:16px">Daily standards: 30 calls/day &nbsp;·&nbsp; 120 min talk time/day &nbsp;·&nbsp; Log every workday &nbsp;&nbsp;|&nbsp;&nbsp; Leading indicators: 12 contracts/month &nbsp;·&nbsp; 20% appt→contract</div>', unsafe_allow_html=True)
 
         s_board=[]
         for rep in data["reps"]:
             comp=get_standards_compliance(rep,data,month_start,today_dt)
             acct=get_accountability_score(rep,data,month_start,today_dt)
             cm=get_consecutive_miss(rep,data)
-            s_board.append((rep,comp,acct,cm))
+            mt=get_daily_range_totals(rep,data,month_start,today_dt)
+            s_board.append((rep,comp,acct,cm,mt))
         s_board.sort(key=lambda x:x[2],reverse=True)
 
-        # Header
-        st.markdown("""<div style="display:grid;grid-template-columns:160px 120px 120px 120px 120px 100px;
-        gap:8px;padding:8px 16px;color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #222">
-        <div>Rep</div><div>Days Logged</div><div>Calls ≥30</div><div>Talk ≥120m</div><div>Both Hit</div><div>Acct Score</div>
-        </div>""", unsafe_allow_html=True)
-
-        for rep,comp,acct,cm in s_board:
-            lc=vcolor(comp["log_pct"],80); cc=vcolor(comp["calls_pct"],80)
+        for rep,comp,acct,cm,mt in s_board:
+            lc=vcolor(comp["log_pct"],80);  cc=vcolor(comp["calls_pct"],80)
             tc=vcolor(comp["talk_pct"],80); bc=vcolor(comp["both_pct"],80)
             ac_col="#a6e3a1" if acct>=80 else "#f9e2af" if acct>=60 else "#f38ba8"
             flag=""
-            if cm["no_log"]>=2: flag=f'<span style="color:#f38ba8;font-size:10px"> ⚠️ {cm["no_log"]}d no log</span>'
-            elif cm["below_standards"]>=2: flag=f'<span style="color:#f9e2af;font-size:10px"> ⚠️ {cm["below_standards"]}d below</span>'
-            st.markdown(f"""<div style="display:grid;grid-template-columns:160px 120px 120px 120px 120px 100px;
-            gap:8px;padding:13px 16px;background:#1a1a1a;border-radius:8px;margin-bottom:6px;
-            border-left:3px solid #cc0000;align-items:center">
-            <div style="color:#fff;font-weight:bold">{rep}{flag}</div>
-            <div style="color:{lc};font-weight:bold">{comp["days_logged"]}/{comp["wd_elapsed"]} <span style="color:#555;font-size:11px">({comp["log_pct"]}%)</span></div>
-            <div style="color:{cc};font-weight:bold">{comp["calls_hit"]}d <span style="color:#555;font-size:11px">({comp["calls_pct"]}%)</span></div>
-            <div style="color:{tc};font-weight:bold">{comp["talk_hit"]}d <span style="color:#555;font-size:11px">({comp["talk_pct"]}%)</span></div>
-            <div style="color:{bc};font-weight:bold">{comp["both_hit"]}d <span style="color:#555;font-size:11px">({comp["both_pct"]}%)</span></div>
-            <div style="color:{ac_col};font-weight:bold;font-size:18px">{acct}</div>
+            if cm["no_log"]>=2:           flag=f'<span style="color:#f38ba8;font-size:10px"> &nbsp;⚠️ {cm["no_log"]}d no log</span>'
+            elif cm["below_standards"]>=2: flag=f'<span style="color:#f9e2af;font-size:10px"> &nbsp;⚠️ {cm["below_standards"]}d below stds</span>'
+
+            cons_m  = mt["contracts"];  appts_m = mt["appointments"]
+            acp_m   = round(cons_m/appts_m*100) if appts_m>0 else 0
+            cons_col= vcolor(cons_m,12); acp_col=vcolor(acp_m,20)
+            cons_bar= min(round(cons_m/12*100),100)
+            acp_bar = min(acp_m,100)
+
+            st.markdown(f"""<div style="background:#1a1a1a;border-radius:12px;padding:18px 22px;margin-bottom:12px;border-left:4px solid #cc0000">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+              <div style="color:#ffffff;font-size:17px;font-weight:bold">{rep}{flag}</div>
+              <div style="text-align:center">
+                <div style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:1px">Accountability Score</div>
+                <div style="color:{ac_col};font-size:26px;font-weight:bold;line-height:1.1">{acct}<span style="color:#444;font-size:12px">/100</span></div>
+              </div>
+            </div>
+
+            <div style="color:#555;font-size:9px;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px">Daily Activity Standards</div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
+              <div style="background:#111;border-radius:8px;padding:10px;text-align:center">
+                <div style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Days Logged</div>
+                <div style="color:{lc};font-size:20px;font-weight:bold">{comp["days_logged"]}/{comp["wd_elapsed"]}</div>
+                <div style="background:#2a2a2a;border-radius:3px;height:4px;margin-top:6px"><div style="background:{lc};width:{comp["log_pct"]}%;height:100%;border-radius:3px"></div></div>
+                <div style="color:#444;font-size:10px;margin-top:4px">{comp["log_pct"]}%</div>
+              </div>
+              <div style="background:#111;border-radius:8px;padding:10px;text-align:center">
+                <div style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Calls ≥ 30/day</div>
+                <div style="color:{cc};font-size:20px;font-weight:bold">{comp["calls_hit"]} days</div>
+                <div style="background:#2a2a2a;border-radius:3px;height:4px;margin-top:6px"><div style="background:{cc};width:{comp["calls_pct"]}%;height:100%;border-radius:3px"></div></div>
+                <div style="color:#444;font-size:10px;margin-top:4px">{comp["calls_pct"]}% of logged days</div>
+              </div>
+              <div style="background:#111;border-radius:8px;padding:10px;text-align:center">
+                <div style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Talk ≥ 120 min/day</div>
+                <div style="color:{tc};font-size:20px;font-weight:bold">{comp["talk_hit"]} days</div>
+                <div style="background:#2a2a2a;border-radius:3px;height:4px;margin-top:6px"><div style="background:{tc};width:{comp["talk_pct"]}%;height:100%;border-radius:3px"></div></div>
+                <div style="color:#444;font-size:10px;margin-top:4px">{comp["talk_pct"]}% of logged days</div>
+              </div>
+              <div style="background:#111;border-radius:8px;padding:10px;text-align:center">
+                <div style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Both Standards Hit</div>
+                <div style="color:{bc};font-size:20px;font-weight:bold">{comp["both_hit"]} days</div>
+                <div style="background:#2a2a2a;border-radius:3px;height:4px;margin-top:6px"><div style="background:{bc};width:{comp["both_pct"]}%;height:100%;border-radius:3px"></div></div>
+                <div style="color:#444;font-size:10px;margin-top:4px">{comp["both_pct"]}% of logged days</div>
+              </div>
+            </div>
+
+            <div style="border-top:1px solid #222;padding-top:14px">
+              <div style="color:#555;font-size:9px;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px">Leading Indicators</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+                <div>
+                  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+                    <span style="color:#aaa;font-size:12px;font-weight:bold">📝 Contracts This Month</span>
+                    <span style="color:{cons_col};font-size:16px;font-weight:bold">{int(cons_m)} <span style="color:#444;font-size:11px">/ 12 goal</span></span>
+                  </div>
+                  <div style="background:#2a2a2a;border-radius:5px;height:8px"><div style="background:{cons_col};width:{cons_bar}%;height:100%;border-radius:5px"></div></div>
+                  <div style="color:#555;font-size:10px;margin-top:4px">{cons_bar}% to goal</div>
+                </div>
+                <div>
+                  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+                    <span style="color:#aaa;font-size:12px;font-weight:bold">📅 Appt → Contract %</span>
+                    <span style="color:{acp_col};font-size:16px;font-weight:bold">{acp_m}% <span style="color:#444;font-size:11px">goal: 20%</span></span>
+                  </div>
+                  <div style="background:#2a2a2a;border-radius:5px;height:8px"><div style="background:{acp_col};width:{acp_bar}%;height:100%;border-radius:5px"></div></div>
+                  <div style="color:#555;font-size:10px;margin-top:4px">{int(mt["appointments"])} appts &nbsp;·&nbsp; {int(cons_m)} contracts</div>
+                </div>
+              </div>
+            </div>
             </div>""", unsafe_allow_html=True)
 
         if not s_board: st.info("Add reps to get started.")
-
-        # Legend
-        st.markdown("""<div style="margin-top:14px;display:flex;gap:16px;flex-wrap:wrap">
+        st.markdown("""<div style="margin-top:10px;display:flex;gap:16px;flex-wrap:wrap">
         <span style="color:#a6e3a1;font-size:11px">● 80%+ On Track</span>
         <span style="color:#f9e2af;font-size:11px">● 60–79% Close</span>
         <span style="color:#f38ba8;font-size:11px">● Below 60% Behind</span>
-        <span style="color:#888;font-size:11px">Accountability Score = avg of: log rate + calls compliance + talk compliance + commitment hit rate</span>
+        <span style="color:#555;font-size:11px">Accountability Score = log rate + calls compliance + talk compliance + commitment hit rate</span>
         </div>""", unsafe_allow_html=True)
 
 # ─── DAILY NUMBERS ───────────────────────────────────────────────────────────
