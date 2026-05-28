@@ -283,7 +283,9 @@ def get_daily_range_totals(rep, data, start_dt, end_dt):
     return totals
 
 with st.sidebar:
-    st.markdown("### 🏠 MCO Sales Dashboard")
+    st.markdown("""<div style="background:#ffffff;border-radius:10px;padding:8px 14px;text-align:center;margin-bottom:4px">
+    <img src="https://raw.githubusercontent.com/mattheller9259/sales-dashboard/main/logo.png" style="max-width:100%;height:auto;max-height:54px">
+    </div>""", unsafe_allow_html=True)
     st.markdown("---")
     page=st.radio("Navigate",["Team Overview","Daily Numbers","Daily Commitments","Individual Rep","Weekly Recap","Log Weekly Results","How to Use"],label_visibility="collapsed")
     st.markdown("---")
@@ -299,7 +301,11 @@ with st.sidebar:
 if page=="Team Overview":
     st.markdown("""<div style="background:linear-gradient(90deg,#0d0d0d,#1a0000,#0d0d0d);
     border:1px solid #cc0000;border-radius:12px;padding:24px;margin-bottom:16px;text-align:center">
-    <div style="color:#cc0000;font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:4px;margin-bottom:6px">Midwest Cash Offer</div>
+    <div style="margin-bottom:14px">
+      <div style="background:#ffffff;border-radius:8px;padding:6px 18px;display:inline-block">
+        <img src="https://raw.githubusercontent.com/mattheller9259/sales-dashboard/main/logo.png" style="height:42px;display:block">
+      </div>
+    </div>
     <div style="color:#ffffff;font-size:48px;font-weight:900;letter-spacing:3px;line-height:1">WIN THE DAY</div>
     <div style="color:#888;font-size:13px;margin-top:8px;letter-spacing:1px">Every call. Every minute. Every day.</div>
     </div>""", unsafe_allow_html=True)
@@ -1271,7 +1277,11 @@ elif page=="Log Weekly Results":
 elif page=="How to Use":
     st.markdown("""<div style="background:linear-gradient(90deg,#0d0d0d,#1a0000,#0d0d0d);
     border:1px solid #cc0000;border-radius:12px;padding:28px 24px;margin-bottom:20px;text-align:center">
-    <div style="color:#cc0000;font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:4px;margin-bottom:8px">Midwest Cash Offer</div>
+    <div style="margin-bottom:14px">
+      <div style="background:#ffffff;border-radius:8px;padding:6px 18px;display:inline-block">
+        <img src="https://raw.githubusercontent.com/mattheller9259/sales-dashboard/main/logo.png" style="height:42px;display:block">
+      </div>
+    </div>
     <div style="color:#ffffff;font-size:42px;font-weight:900;letter-spacing:3px;line-height:1">WIN THE DAY</div>
     <div style="color:#888;font-size:13px;margin-top:10px;letter-spacing:1px">Every call. Every minute. Every day.</div>
     </div>""", unsafe_allow_html=True)
