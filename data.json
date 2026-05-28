@@ -44,7 +44,18 @@
       }
     }
   },
-  "daily_logs": {},
+  "daily_logs": {
+    "Fletcher Mielke": {
+      "2026-05-28": {
+        "calls": 132,
+        "talk_time": 164,
+        "appointments": 5,
+        "offers": 3,
+        "contracts": 0,
+        "logged_at": "09:39 PM"
+      }
+    }
+  },
   "pins": {
     "Fletcher Mielke": "2001"
   },
