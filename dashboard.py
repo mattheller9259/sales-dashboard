@@ -98,20 +98,42 @@ def month_key(dt=None): return (dt or datetime.now()).strftime("%Y-%m")
 def month_label(k):     return datetime.strptime(k+"-01","%Y-%m-%d").strftime("%B %Y")
 def fmt_date(k):        return datetime.strptime(k,"%Y-%m-%d").strftime("%A, %b %d")
 
-def get_monthly(rep,month,data):
-    entries={w:e for w,e in data["entries"].get(rep,{}).items() if w.startswith(month)}
-    if not entries: return None
-    keys=["calls","talk_time","appointments","offers","contracts","closed_deals","revenue","spread"]
-    t={k:sum(e.get(k,0) for e in entries.values()) for k in keys}
-    t["weeks"]=len(entries)
+def get_monthly(rep, month, data):
+    # Results (closed deals, revenue, spread) come from Log Weekly Results entries
+    entries = {w:e for w,e in data["entries"].get(rep,{}).items() if w.startswith(month)}
+    # Activity metrics come from daily logs
+    try:
+        m_start = datetime.strptime(month + "-01", "%Y-%m-%d").date()
+        next_mo = (m_start.replace(day=28) + timedelta(days=4)).replace(day=1)
+        m_end   = next_mo - timedelta(days=1)
+        logs    = data.get("daily_logs", {}).get(rep, {})
+        act     = {k:0 for k in ["calls","talk_time","appointments","offers","contracts"]}
+        days_logged = 0
+        cur = m_start
+        while cur <= m_end:
+            e = logs.get(cur.strftime("%Y-%m-%d"))
+            if e:
+                for k in act: act[k] += e.get(k, 0)
+                days_logged += 1
+            cur += timedelta(days=1)
+    except:
+        act = {k:0 for k in ["calls","talk_time","appointments","offers","contracts"]}
+        days_logged = 0
+
+    if not entries and days_logged == 0: return None
+
+    t = {k: sum(e.get(k,0) for e in entries.values()) for k in ["closed_deals","revenue","spread"]}
+    t["weeks"] = len(entries)
+    t.update(act)
+
     ap=t["appointments"]; con=t["contracts"]; cl=t["closed_deals"]
-    t["offer_pct"]    =t["offers"]/ap*100   if ap>0  else 0.0
-    t["appt_con_pct"] =con/ap*100           if ap>0  else 0.0
-    t["con_close_pct"]=cl/con*100           if con>0 else 0.0
-    t["avg_spread"]   =t["spread"]/cl       if cl>0  else 0.0
-    weights={"calls":15,"talk_time":15,"contracts":25,"closed_deals":20,"revenue":25}
-    quotas ={"calls":600,"talk_time":2400,"contracts":12,"closed_deals":6,"revenue":100000}
-    t["score"]=round(sum(min(t[k]/quotas[k],1.0)*w for k,w in weights.items()),1)
+    t["offer_pct"]    = t["offers"]/ap*100  if ap>0  else 0.0
+    t["appt_con_pct"] = con/ap*100          if ap>0  else 0.0
+    t["con_close_pct"]= cl/con*100          if con>0 else 0.0
+    t["avg_spread"]   = t["spread"]/cl      if cl>0  else 0.0
+    weights = {"calls":15,"talk_time":15,"contracts":25,"closed_deals":20,"revenue":25}
+    quotas  = {"calls":600,"talk_time":2400,"contracts":12,"closed_deals":6,"revenue":100000}
+    t["score"] = round(sum(min(t[k]/quotas[k],1.0)*w for k,w in weights.items()), 1)
     return t
 
 def get_streak(rep,data):
@@ -172,7 +194,7 @@ def get_daily_range_totals(rep, data, start_dt, end_dt):
 with st.sidebar:
     st.markdown("### 🏠 MCO Sales Dashboard")
     st.markdown("---")
-    page=st.radio("Navigate",["Team Overview","Daily Numbers","Daily Commitments","Individual Rep","Log Performance"],label_visibility="collapsed")
+    page=st.radio("Navigate",["Team Overview","Daily Numbers","Daily Commitments","Individual Rep","Log Weekly Results"],label_visibility="collapsed")
     st.markdown("---")
     all_months=set([month_key()])
     for rd in data["entries"].values():
@@ -342,7 +364,14 @@ elif page=="Daily Numbers":
 
     # ── Log Today's Numbers ──
     with tab2:
-        st.markdown(f"### Log Numbers for {fmt_date(today_key())}")
+        st.markdown(f"""<div style="background:#001a00;border:1px solid #22c55e;border-radius:10px;
+        padding:14px 20px;margin-bottom:18px">
+        <div style="color:#a6e3a1;font-weight:bold;font-size:14px">📋 REPS — Log Your Numbers Here</div>
+        <div style="color:#cdd6f4;font-size:13px;margin-top:4px">
+        At the end of every day, select your name and enter your activity numbers below.
+        This is the only form you need to fill out daily.</div>
+        </div>""", unsafe_allow_html=True)
+        st.markdown(f"### {fmt_date(today_key())}")
         rep  = st.selectbox("Select Rep", data["reps"], key="daily_rep")
         existing = data["daily_logs"].get(rep,{}).get(today_key())
 
@@ -649,39 +678,77 @@ elif page=="Individual Rep":
     else:
         st.markdown("""<div style="background:#1a1a1a;border-radius:10px;padding:14px 18px;margin-top:8px">
         <div style="color:#888;font-size:12px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Closed Deals / Revenue / Spread</div>
-        <div style="color:#cdd6f4;font-size:13px">Use <b>Log Performance</b> to log weekly results (closed deals, revenue, spread).
+        <div style="color:#cdd6f4;font-size:13px">Use <b>Log Weekly Results</b> (manager page) to log closed deals, revenue, and spread.
         That unlocks the full performance score and percentage metrics.</div>
         </div>""", unsafe_allow_html=True)
 
-# ─── LOG PERFORMANCE ──────────────────────────────────────────────────────────
-elif page=="Log Performance":
-    st.markdown("## Log Weekly Performance")
-    with st.expander("Add New Rep",expanded=not bool(data["reps"])):
-        nr=st.text_input("Rep Name")
-        if st.button("Add Rep",type="primary"):
+# ─── LOG WEEKLY RESULTS ───────────────────────────────────────────────────────
+elif page=="Log Weekly Results":
+    st.markdown(f"""<div class="mco-header">
+    <div style="color:#ffffff;font-size:22px;font-weight:bold;letter-spacing:1px">Log Weekly Results</div>
+    <div style="color:#ffcccc;font-size:14px;margin-top:2px">Manager use — log closed deals, revenue & spread each week</div>
+    </div>""", unsafe_allow_html=True)
+
+    st.markdown("""<div style="background:#1a0a00;border:1px solid #cc0000;border-radius:10px;
+    padding:14px 20px;margin-bottom:20px">
+    <div style="color:#f9e2af;font-weight:bold;font-size:13px">FOR MANAGERS ONLY</div>
+    <div style="color:#cdd6f4;font-size:13px;margin-top:4px">
+    Reps log their daily numbers (calls, talk time, appointments, offers, contracts) in the
+    <b>Daily Numbers</b> page — no entry needed here for those.<br><br>
+    This page is for logging <b>closed deals, revenue, and spread</b> once a week.
+    These numbers unlock the full performance score and percentage metrics on each rep's profile.
+    </div>
+    </div>""", unsafe_allow_html=True)
+
+    # ── Add / manage reps ──
+    with st.expander("Add New Rep", expanded=not bool(data["reps"])):
+        nr = st.text_input("Rep Name")
+        if st.button("Add Rep", type="primary"):
             if nr and nr not in data["reps"]:
-                data["reps"].append(nr); data["entries"].setdefault(nr,{})
+                data["reps"].append(nr)
+                data["entries"].setdefault(nr, {})
                 save_data(data); st.success(f"{nr} added!"); st.rerun()
-            elif nr in data["reps"]: st.warning("Rep already exists.")
+            elif nr in data["reps"]:
+                st.warning("Rep already exists.")
+
     st.markdown("---")
-    if not data["reps"]: st.info("Add a rep first."); st.stop()
-    rep=st.selectbox("Select Rep",data["reps"],key="log_rep")
-    week=st.text_input("Week — Monday date (YYYY-MM-DD)",value=week_key())
-    st.markdown("**Activity**")
-    c1,c2,c3=st.columns(3)
-    with c1: calls=st.number_input("Calls",min_value=0,value=0); talk_time=st.number_input("Talk Time (min)",min_value=0,value=0)
-    with c2: appts=st.number_input("Appointments",min_value=0,value=0); offers=st.number_input("Offers",min_value=0,value=0)
-    with c3: contracts=st.number_input("Contracts",min_value=0,value=0)
-    st.markdown("**Results**")
-    c4,c5,c6=st.columns(3)
-    with c4: closed =st.number_input("Closed Deals",min_value=0,value=0)
-    with c5: revenue=st.number_input("Revenue ($)",min_value=0,value=0)
-    with c6: spread =st.number_input("Total Spread ($)",min_value=0,value=0)
-    if st.button("Save Entry",type="primary"):
+    if not data["reps"]: st.info("Add a rep above to get started."); st.stop()
+
+    rep  = st.selectbox("Select Rep", data["reps"], key="log_rep")
+    week = st.text_input("Week of (Monday's date — YYYY-MM-DD)", value=week_key())
+
+    st.markdown('<div class="section-hdr">Weekly Results</div>', unsafe_allow_html=True)
+    r1, r2, r3 = st.columns(3)
+    with r1: closed  = st.number_input("Closed Deals",    min_value=0, value=0)
+    with r2: revenue = st.number_input("Revenue ($)",     min_value=0, value=0)
+    with r3: spread  = st.number_input("Total Spread ($)",min_value=0, value=0)
+
+    if st.button("Save Weekly Results", type="primary"):
         try:
-            datetime.strptime(week,"%Y-%m-%d")
-            data["entries"].setdefault(rep,{})[week]={"calls":calls,"talk_time":talk_time,
-                "appointments":appts,"offers":offers,"contracts":contracts,
-                "closed_deals":closed,"revenue":revenue,"spread":spread}
-            save_data(data); st.success(f"Saved for {rep} — week of {week}!")
-        except ValueError: st.error("Invalid date. Use YYYY-MM-DD.")
+            datetime.strptime(week, "%Y-%m-%d")
+            existing = data["entries"].setdefault(rep, {}).get(week, {})
+            # Keep any existing activity fields (from old entries), only update results
+            existing.update({"closed_deals": closed, "revenue": revenue, "spread": spread})
+            data["entries"][rep][week] = existing
+            save_data(data)
+            st.success(f"Results saved for {rep} — week of {week}!")
+        except ValueError:
+            st.error("Invalid date format. Use YYYY-MM-DD.")
+
+    # ── Show what's already logged this month ──
+    st.markdown('<div class="section-hdr">Already Logged This Month</div>', unsafe_allow_html=True)
+    month_entries = {w:e for w,e in data["entries"].get(rep,{}).items() if w.startswith(month_key())}
+    if month_entries:
+        for wk in sorted(month_entries.keys(), reverse=True):
+            e = month_entries[wk]
+            st.markdown(f"""<div style="background:#1a1a1a;border-radius:8px;padding:12px 16px;
+            margin-bottom:6px;border-left:3px solid #cc0000;display:flex;justify-content:space-between;align-items:center">
+            <div style="color:#cdd6f4;font-size:13px">Week of {fmt_date(wk)}</div>
+            <div style="color:#888;font-size:13px">
+              {int(e.get("closed_deals",0))} closed &nbsp;·&nbsp;
+              ${e.get("revenue",0):,.0f} revenue &nbsp;·&nbsp;
+              ${e.get("spread",0):,.0f} spread
+            </div>
+            </div>""", unsafe_allow_html=True)
+    else:
+        st.info(f"No weekly results logged yet for {month_label(month_key())}.")
