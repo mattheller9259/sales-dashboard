@@ -269,7 +269,7 @@ def get_weekly_score(wt):
 def get_daily_range_totals(rep, data, start_dt, end_dt):
     """Sum daily_logs for a rep across a date range. Returns totals + day-by-day list."""
     logs = data.get("daily_logs", {}).get(rep, {})
-    keys = ["calls","talk_time","appointments","offers","contracts"]
+    keys = ["calls","talk_time","appointments","offers","contracts","approved_contracts"]
     totals = {k:0 for k in keys}
     day_entries = []
     current = start_dt
@@ -486,12 +486,13 @@ if page=="Team Overview":
         if logged:
             st.markdown('<div class="section-hdr">Team Today</div>', unsafe_allow_html=True)
             n=len(logged)
-            tc1,tc2,tc3,tc4,tc5=st.columns(5)
-            tc1.metric("Total Calls",    int(sum(l.get("calls",0) for _,l,_ in logged)),        f"Goal: {30*n}")
-            tc2.metric("Talk Time",      f"{int(sum(l.get('talk_time',0) for _,l,_ in logged))} min", f"Goal: {120*n} min")
-            tc3.metric("Appointments",   int(sum(l.get("appointments",0) for _,l,_ in logged)))
-            tc4.metric("Offers",         int(sum(l.get("offers",0) for _,l,_ in logged)))
-            tc5.metric("Contracts",      int(sum(l.get("contracts",0) for _,l,_ in logged)),    f"Goal: {n}/day")
+            tc1,tc2,tc3,tc4,tc5,tc6=st.columns(6)
+            tc1.metric("Total Calls",        int(sum(l.get("calls",0) for _,l,_ in logged)),          f"Goal: {30*n}")
+            tc2.metric("Talk Time",          f"{int(sum(l.get('talk_time',0) for _,l,_ in logged))} min", f"Goal: {120*n} min")
+            tc3.metric("Appointments",       int(sum(l.get("appointments",0) for _,l,_ in logged)))
+            tc4.metric("Offers",             int(sum(l.get("offers",0) for _,l,_ in logged)))
+            tc5.metric("Contracts",          int(sum(l.get("contracts",0) for _,l,_ in logged)),      f"Goal: {n}/day")
+            tc6.metric("Approved Contracts", int(sum(l.get("approved_contracts",0) for _,l,_ in logged)))
 
         st.markdown('<div class="section-hdr">Daily Leaderboard</div>', unsafe_allow_html=True)
         leader_log  = logged[0][1] if logged else None
@@ -501,12 +502,14 @@ if page=="Team Overview":
             streak=get_streak(rep,data)
             if not log: ghost_card(rank,rep); continue
             calls=log.get("calls",0); talk=log.get("talk_time",0)
-            appts=log.get("appointments",0); offs=log.get("offers",0); cons=log.get("contracts",0)
+            appts=log.get("appointments",0); offs=log.get("offers",0)
+            cons=log.get("contracts",0); appr=log.get("approved_contracts",0)
             acp=f"{offs/appts*100:.0f}%" if appts>0 else "--"
             tc=vcolor(calls,30); tt=vcolor(talk,120)
             stats=(f'<span style="color:{tc};font-weight:bold">{int(calls)} calls</span>'
                    f' &nbsp;·&nbsp; <span style="color:{tt};font-weight:bold">{int(talk)} min</span>'
                    f' &nbsp;·&nbsp; <span style="color:{"#22c55e" if cons>=1 else "#cdd6f4"};font-weight:bold">{int(cons)} contracts</span>'
+                   f' &nbsp;·&nbsp; <span style="color:{"#22c55e" if appr>=1 else "#cdd6f4"};font-weight:bold">{int(appr)} approved</span>'
                    f' &nbsp;·&nbsp; <span style="color:#888">{int(appts)} appts &nbsp;·&nbsp; {acp} offer rate</span>')
             nm=""
             if rank>1 and leader_log:
@@ -815,38 +818,29 @@ elif page=="Daily Numbers":
         # Summary row at top
         if logged:
             st.markdown('<div class="section-hdr">Today\'s Team Summary</div>', unsafe_allow_html=True)
-            c1,c2,c3,c4,c5 = st.columns(5)
-            total_calls     = sum(l.get("calls",0) for _,l,_ in logged)
-            total_talk      = sum(l.get("talk_time",0) for _,l,_ in logged)
-            total_appts     = sum(l.get("appointments",0) for _,l,_ in logged)
-            total_offers    = sum(l.get("offers",0) for _,l,_ in logged)
-            total_contracts = sum(l.get("contracts",0) for _,l,_ in logged)
+            c1,c2,c3,c4,c5,c6 = st.columns(6)
+            total_calls      = sum(l.get("calls",0) for _,l,_ in logged)
+            total_talk       = sum(l.get("talk_time",0) for _,l,_ in logged)
+            total_appts      = sum(l.get("appointments",0) for _,l,_ in logged)
+            total_offers     = sum(l.get("offers",0) for _,l,_ in logged)
+            total_contracts  = sum(l.get("contracts",0) for _,l,_ in logged)
+            total_approved   = sum(l.get("approved_contracts",0) for _,l,_ in logged)
             n = len(logged)
-            c1.metric("Total Calls",      int(total_calls),      f"Goal: {30*n}")
-            c2.metric("Total Talk Time",  f"{int(total_talk)} min", f"Goal: {120*n} min")
-            c3.metric("Appointments",     int(total_appts))
-            c4.metric("Offers",           int(total_offers))
-            c5.metric("Contracts",        int(total_contracts),  f"Goal: {3*n}/week")
+            c1.metric("Total Calls",         int(total_calls),       f"Goal: {30*n}")
+            c2.metric("Total Talk Time",     f"{int(total_talk)} min", f"Goal: {120*n} min")
+            c3.metric("Appointments",        int(total_appts))
+            c4.metric("Offers",              int(total_offers))
+            c5.metric("Contracts",           int(total_contracts),   f"Goal: {3*n}/week")
+            c6.metric("Approved Contracts",  int(total_approved))
 
         st.markdown('<div class="section-hdr">Daily Leaderboard</div>', unsafe_allow_html=True)
 
         # Header row
-        st.markdown("""<div style="display:grid;grid-template-columns:40px 160px 110px 120px 100px 100px 100px 80px;
-        gap:8px;padding:8px 16px;color:#888888;font-size:11px;text-transform:uppercase;letter-spacing:1px">
-        <div>#</div><div>Rep</div><div>Calls</div>
-        <div>Talk Time</div><div>Appts</div><div>Offers</div><div>Contracts</div><div>Score</div>
-        </div>""", unsafe_allow_html=True)
+        st.markdown('<div style="display:grid;grid-template-columns:40px 150px 100px 110px 80px 80px 100px 110px 70px;gap:8px;padding:8px 16px;color:#888888;font-size:11px;text-transform:uppercase;letter-spacing:1px"><div>#</div><div>Rep</div><div>Calls</div><div>Talk Time</div><div>Appts</div><div>Offers</div><div>Contracts</div><div>Approved</div><div>Score</div></div>', unsafe_allow_html=True)
 
         for rank,(rep,log,score) in enumerate(board,1):
             if not log:
-                st.markdown(f"""<div style="display:grid;grid-template-columns:40px 160px 110px 120px 100px 100px 100px 80px;
-                gap:8px;padding:12px 16px;background:#1a1a1a;border-radius:8px;margin-bottom:6px;
-                border-left:3px solid #333;align-items:center">
-                <div style="color:#888">#{rank}</div>
-                <div style="color:#ffffff;font-weight:bold">{rep}</div>
-                <div style="color:#555;font-style:italic">Not logged</div>
-                <div></div><div></div><div></div><div></div><div></div>
-                </div>""", unsafe_allow_html=True)
+                st.markdown(f'<div style="display:grid;grid-template-columns:40px 150px 100px 110px 80px 80px 100px 110px 70px;gap:8px;padding:12px 16px;background:#1a1a1a;border-radius:8px;margin-bottom:6px;border-left:3px solid #333;align-items:center"><div style="color:#888">#{rank}</div><div style="color:#ffffff;font-weight:bold">{rep}</div><div style="color:#555;font-style:italic">Not logged</div><div></div><div></div><div></div><div></div><div></div><div></div></div>', unsafe_allow_html=True)
                 continue
 
             calls     = log.get("calls",0);      tc = vcolor(calls,30)
@@ -854,23 +848,14 @@ elif page=="Daily Numbers":
             appts     = log.get("appointments",0)
             offers    = log.get("offers",0)
             contracts = log.get("contracts",0)
+            approved  = log.get("approved_contracts",0)
             off_rate  = (offers/appts*100) if appts>0 else 0; to = vcolor(off_rate,100)
             medal     = "🥇" if rank==1 else "🥈" if rank==2 else "🥉" if rank==3 else f"#{rank}"
             sc_col    = "#22c55e" if score>=80 else "#f59e0b" if score>=60 else "#cc0000"
             con_col   = "#22c55e" if contracts>=1 else "#ffffff"
+            apr_col   = "#22c55e" if approved>=1 else "#ffffff"
 
-            st.markdown(f"""<div style="display:grid;grid-template-columns:40px 160px 110px 120px 100px 100px 100px 80px;
-            gap:8px;padding:14px 16px;background:#1a1a1a;border-radius:8px;margin-bottom:6px;
-            border-left:3px solid #cc0000;align-items:center">
-            <div style="font-size:18px">{medal}</div>
-            <div style="color:#ffffff;font-weight:bold;font-size:15px">{rep}</div>
-            <div style="color:{tc};font-weight:bold">{int(calls)}/30</div>
-            <div style="color:{tt};font-weight:bold">{int(talk)}/120m</div>
-            <div style="color:#ffffff">{int(appts)}</div>
-            <div style="color:{to};font-weight:bold">{int(offers)}</div>
-            <div style="color:{con_col};font-weight:bold">{int(contracts)}</div>
-            <div style="color:{sc_col};font-weight:bold">{score}</div>
-            </div>""", unsafe_allow_html=True)
+            st.markdown(f'<div style="display:grid;grid-template-columns:40px 150px 100px 110px 80px 80px 100px 110px 70px;gap:8px;padding:14px 16px;background:#1a1a1a;border-radius:8px;margin-bottom:6px;border-left:3px solid #cc0000;align-items:center"><div style="font-size:18px">{medal}</div><div style="color:#ffffff;font-weight:bold;font-size:15px">{rep}</div><div style="color:{tc};font-weight:bold">{int(calls)}/30</div><div style="color:{tt};font-weight:bold">{int(talk)}/120m</div><div style="color:#ffffff">{int(appts)}</div><div style="color:{to};font-weight:bold">{int(offers)}</div><div style="color:{con_col};font-weight:bold">{int(contracts)}</div><div style="color:{apr_col};font-weight:bold">{int(approved)}</div><div style="color:{sc_col};font-weight:bold">{score}</div></div>', unsafe_allow_html=True)
 
         st.markdown("""<div style="color:#555;font-size:11px;margin-top:12px">
         Goals: Calls 30/day &nbsp;·&nbsp; Talk Time 120 min/day &nbsp;·&nbsp; Offer on every appointment
@@ -898,16 +883,18 @@ elif page=="Daily Numbers":
 
         if existing:
             st.success(f"Numbers already logged at {existing.get('logged_at','')}")
-            ec1,ec2,ec3,ec4 = st.columns(4)
-            ec1.metric("Calls",     int(existing.get("calls",0)),     delta=f"{int(existing.get('calls',0))-30} vs goal")
-            ec2.metric("Talk Time", f"{int(existing.get('talk_time',0))} min", delta=f"{int(existing.get('talk_time',0))-120} vs goal")
-            ec3.metric("Appointments", int(existing.get("appointments",0)))
-            ec4.metric("Offers",    int(existing.get("offers",0)))
+            ec1,ec2,ec3,ec4,ec5,ec6 = st.columns(6)
+            ec1.metric("Calls",              int(existing.get("calls",0)),     delta=f"{int(existing.get('calls',0))-30} vs goal")
+            ec2.metric("Talk Time",          f"{int(existing.get('talk_time',0))} min", delta=f"{int(existing.get('talk_time',0))-120} vs goal")
+            ec3.metric("Appointments",       int(existing.get("appointments",0)))
+            ec4.metric("Offers",             int(existing.get("offers",0)))
+            ec5.metric("Contracts",          int(existing.get("contracts",0)))
+            ec6.metric("Approved Contracts", int(existing.get("approved_contracts",0)))
             if st.button("Update Numbers"):
                 del data["daily_logs"][rep][today_key()]
                 save_data(data); st.rerun()
         else:
-            dc1,dc2,dc3 = st.columns(3)
+            dc1,dc2,dc3,dc4 = st.columns(4)
             with dc1:
                 d_calls = st.number_input("Calls Made",        min_value=0, value=0)
                 d_talk  = st.number_input("Talk Time (min)",   min_value=0, value=0)
@@ -916,12 +903,15 @@ elif page=="Daily Numbers":
                 d_offers= st.number_input("Offers Made",       min_value=0, value=0)
             with dc3:
                 d_contracts = st.number_input("Contracts",     min_value=0, value=0)
+            with dc4:
+                d_approved  = st.number_input("Approved Contracts", min_value=0, value=0,
+                                              help="Contracts that have been approved/accepted")
 
             if st.button("Save Today's Numbers", type="primary"):
                 data["daily_logs"].setdefault(rep,{})[today_key()] = {
                     "calls":d_calls,"talk_time":d_talk,
                     "appointments":d_appts,"offers":d_offers,
-                    "contracts":d_contracts,
+                    "contracts":d_contracts,"approved_contracts":d_approved,
                     "logged_at":datetime.now().strftime("%I:%M %p")
                 }
                 save_data(data)
